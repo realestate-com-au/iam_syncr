@@ -1,0 +1,12 @@
+---
+
+roles:
+  "project-deploy-stg":
+    description: Role for deploying the project
+    allow_to_assume_me:
+      - { account: development, iam: role/ci-role }
+
+    allow_permission:
+      - { action: "ec2:*", resource: "*" }
+      - { action: "iam:*", resource: { "iam": "__self__" } }
+

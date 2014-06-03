@@ -1,0 +1,23 @@
+---
+
+roles:
+  "ci-role":
+    description: "Role for the CI server"
+    make_instance_profile: true
+    allow_to_assume_me:
+      - { service: ec2 }
+
+    allow_permission:
+      - action: "sts:AssumeRole"
+        resource:
+          - { account: development, iam: role/project-deploy-dev }
+          - { account: staging, iam: role/project-deploy-stg }
+
+  "project-deploy-dev":
+    description: Role for deploying the project
+    allow_to_assume_me:
+      - { account: development, iam: role/ci-role }
+
+    allow_permission:
+      - { action: "ec2:*", resource: "*" }
+
