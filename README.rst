@@ -8,10 +8,7 @@ Installation
 
 Just use pip::
 
-   # From this folder
-   pip install .
-
-   # (Pypi package is yet to be put up)
+   pip install iam_syncr
 
 Usage
 =====
