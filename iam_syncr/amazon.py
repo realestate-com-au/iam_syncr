@@ -132,7 +132,7 @@ class Amazon(object):
     def create_role(self, name, trust_document, policies=None):
         """Create a role"""
         with self.catch_boto_400("{0} trust document".format(name), trust_document, "Couldn't create role", role=name):
-            log.info("Creating a new role\trole=%s", self.name)
+            log.info("Creating a new role\trole=%s", name)
             self.connection.create_role(name, assume_role_policy_document=trust_document)
             self.changes = True
 
