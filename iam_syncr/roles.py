@@ -25,7 +25,7 @@ class Role(object):
         self.name = name
         self.amazon = amazon
         self.definition = definition
-        self.policy_name = "syncr_policy_{0}".format(self.name)
+        self.policy_name = "syncr_policy_{0}".format(self.name.replace("/", "__"))
 
         self.trust = {}
         self.distrust = {}
