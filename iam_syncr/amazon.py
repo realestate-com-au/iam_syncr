@@ -58,24 +58,38 @@ class Amazon(object):
         return connection
 
     @contextmanager
-    def catch_boto_400(self, heading, document, message, **info):
+    def catch_boto_400(self, message, heading=None, document=None, **info):
         """Turn a BotoServerError 400 into a BadAmazon"""
         try:
             yield
         except boto.exception.BotoServerError as error:
             if error.status == 400:
-                print("=" * 80)
-                print(heading)
-                print(document)
-                print("=" * 80)
+                if heading or document:
+                    print("=" * 80)
+                    if heading:
+                        print(heading)
+                    print(document)
+                    print("=" * 80)
                 raise BadAmazon(message, error_code=error.code, error_message=error.message, **info)
             else:
                 raise
 
+    def split_role_name(self, name):
+        """Split a role name into it's (name, path)"""
+        split = name.split('/')
+        role_name = split[-1]
+        path = '/'.join(split[0:-1]) or None
+        if path and not path.startswith('/'):
+            path = "/{0}".format(path)
+        if path and not path.endswith("/"):
+            path = "{0}/".format(path)
+        return role_name, path
+
     def role_info(self, name):
         """Return what amazon knows about this role"""
         try:
-            return self.connection.get_role(name)["get_role_response"]["get_role_result"]
+            role_name, _ = self.split_role_name(name)
+            return self.connection.get_role(role_name)["get_role_response"]["get_role_result"]
         except boto.exception.BotoServerError as error:
             if error.status == 404:
                 return False
@@ -87,7 +101,9 @@ class Amazon(object):
 
     def info_for_profile(self, name):
         """Return what roles are attached to this profile if it exists"""
-        result = self.connection.list_instance_profiles_for_role(name)
+        role_name, _ = self.split_role_name(name)
+        with self.catch_boto_400("Couldn't list instance profiles associated with a role", role=role_name):
+            result = self.connection.list_instance_profiles_for_role(role_name)
         profiles = result["list_instance_profiles_for_role_response"]["list_instance_profiles_for_role_result"]["instance_profiles"]
 
         existing_profile = None
@@ -104,11 +120,13 @@ class Amazon(object):
 
     def make_instance_profile(self, name):
         """Make an instance profile with this name containing this role"""
-        existing_roles_in_profile = self.info_for_profile(name)
+        role_name, _ = self.split_role_name(name)
+        existing_roles_in_profile = self.info_for_profile(role_name)
         if existing_roles_in_profile is None:
             try:
-                log.info("Making instance profile\tname=%s", name)
-                self.connection.create_instance_profile(name)
+                log.info("Making instance profile\tname=%s", role_name)
+                with self.catch_boto_400("Couldn't create instance profile", instance_profile=role_name):
+                    self.connection.create_instance_profile(role_name)
                 self.changes = True
             except boto.exception.BotoServerError as error:
                 if error.status == 409 and error.code == "EntityAlreadyExists":
@@ -118,30 +136,33 @@ class Amazon(object):
                 else:
                     raise
 
-        if existing_roles_in_profile and any(rl != name for rl in existing_roles_in_profile):
-            for role in [rl for rl in existing_roles_in_profile if rl != name]:
-                log.info("Removing role from existing instance_profile\tprofile=%s\trole=%s", name, role)
-                self.connection.remove_role_from_instance_profile(name, role)
+        if existing_roles_in_profile and any(rl != role_name for rl in existing_roles_in_profile):
+            for role in [rl for rl in existing_roles_in_profile if rl != role_name]:
+                log.info("Removing role from existing instance_profile\tprofile=%s\trole=%s", role_name, role)
+                with self.catch_boto_400("Couldn't remove role from an instance profile", profile=role_name, role=role):
+                    self.connection.remove_role_from_instance_profile(role_name, role)
                 self.changes = True
 
-        if not existing_roles_in_profile or not any(rl == name for rl in existing_roles_in_profile):
-            log.info("Adding role to an instance_profile\tprofile=%s\trole=%s", name, name)
-            self.connection.add_role_to_instance_profile(name, name)
+        if not existing_roles_in_profile or not any(rl == role_name for rl in existing_roles_in_profile):
+            log.info("Adding role to an instance_profile\tprofile=%s\trole=%s", role_name, role_name)
+            with self.catch_boto_400("Couldn't add role to an instance profile", role=role_name, instance_profile=role_name):
+                self.connection.add_role_to_instance_profile(role_name, role_name)
             self.changes = True
 
     def create_role(self, name, trust_document, policies=None):
         """Create a role"""
-        with self.catch_boto_400("{0} trust document".format(name), trust_document, "Couldn't create role", role=name):
+        role_name, role_path = self.split_role_name(name)
+        with self.catch_boto_400("Couldn't create role", "{0} trust document".format(name), trust_document, role=name):
             log.info("Creating a new role\trole=%s", name)
-            self.connection.create_role(name, assume_role_policy_document=trust_document)
+            self.connection.create_role(role_name, assume_role_policy_document=trust_document, path=role_path)
             self.changes = True
 
         # And add our permissions
         if policies:
             for policy_name, document in policies.items():
                 if document:
-                    with self.catch_boto_400("{0} - {1} Permission document".format(name, policy_name), document, "Couldn't add policy", role=name, policy_name=policy_name):
-                        self.connection.put_role_policy(name, policy_name, document)
+                    with self.catch_boto_400("Couldn't add policy", "{0} - {1} Permission document".format(role_name, policy_name), document, role=role_name, policy_name=policy_name):
+                        self.connection.put_role_policy(role_name, policy_name, document)
                         self.changes = True
 
     def compare_trust_document(self, role_info, trust_document):
@@ -168,10 +189,11 @@ class Amazon(object):
 
     def modify_role(self, role_info, name, trust_document, policies=LeaveAlone):
         """Modify a role"""
+        role_name, _ = self.split_role_name(name)
         if trust_document and not self.compare_trust_document(role_info, trust_document):
-            with self.catch_boto_400("{0} assume document".format(name), trust_document, "Couldn't modify trust document", role=name):
-                log.info("Modifying trust document\trole=%s", name)
-                self.connection.update_assume_role_policy(name, trust_document)
+            with self.catch_boto_400("Couldn't modify trust document", "{0} assume document".format(role_name), trust_document, role=role_name):
+                log.info("Modifying trust document\trole=%s", role_name)
+                self.connection.update_assume_role_policy(role_name, trust_document)
                 self.changes = True
 
         if policies is LeaveAlone:
@@ -180,47 +202,53 @@ class Amazon(object):
             policies = {}
 
         unknown = []
-        current_policies = self.current_role_policies(name, comparing=[pn for pn in policies])
+        with self.catch_boto_400("Couldn't get policies for a role", role=role_name):
+            current_policies = self.current_role_policies(role_name, comparing=[pn for pn in policies])
         unknown = [key for key in current_policies if key not in policies]
 
         if unknown:
-            log.info("Role has unknown policies that will be disassociated\trole=%s\tunknown=%s", name, unknown)
+            log.info("Role has unknown policies that will be disassociated\trole=%s\tunknown=%s", role_name, unknown)
             for policy in unknown:
-                self.connection.delete_role_policy(name, policy)
+                with self.catch_boto_400("Couldn't delete a policy from a role", policy=policy, role=role_name):
+                    self.connection.delete_role_policy(role_name, policy)
                 self.changes = True
 
         for policy, document in policies.items():
             if not document:
                 if policy in current_policies:
-                    log.info("Removing policy\trole=%s\tpolicy=%s", name, policy)
-                    self.connection.delete_role_policy(name, policy)
+                    log.info("Removing policy\trole=%s\tpolicy=%s", role_name, policy)
+                    with self.catch_boto_400("Couldn't delete a policy from a role", policy=policy, role=role_name):
+                        self.connection.delete_role_policy(role_name, policy)
                     self.changes = True
             else:
                 needed = False
                 if policy in current_policies:
                     if not self.compare_two_documents(current_policies.get(policy), document):
-                        log.info("Overriding existing policy\trole=%s\tpolicy=%s", name, policy)
+                        log.info("Overriding existing policy\trole=%s\tpolicy=%s", role_name, policy)
                         needed = True
                 else:
-                    log.info("Adding policy to existing role\trole=%s\tpolicy=%s", name, policy)
+                    log.info("Adding policy to existing role\trole=%s\tpolicy=%s", role_name, policy)
                     needed = True
 
                 if needed:
-                    with self.catch_boto_400("{0} - {1} policy document".format(name, policy), document, "Couldn't add policy document", role=name, policy=policy):
-                        self.connection.put_role_policy(name, policy, document)
+                    with self.catch_boto_400("Couldn't add policy document", "{0} - {1} policy document".format(role_name, policy), document, role=role_name, policy=policy):
+                        self.connection.put_role_policy(role_name, policy, document)
                         log.debug(policy)
                         log.debug(document)
                         log.debug('------')
 
     def current_role_policies(self, name, comparing):
         """Get the current policies for some role"""
-        policies = self.connection.list_role_policies(name)["list_role_policies_response"]["list_role_policies_result"]["policy_names"]
+        role_name, _ = self.split_role_name(name)
+        with self.catch_boto_400("Couldn't get policies for a role", role=name):
+            policies = self.connection.list_role_policies(role_name)["list_role_policies_response"]["list_role_policies_result"]["policy_names"]
 
         found = {}
         for policy in policies:
             document = None
             if policy in comparing:
-                doc = self.connection.get_role_policy(name, policy)["get_role_policy_response"]["get_role_policy_result"]["policy_document"]
+                with self.catch_boto_400("Couldn't get policy document for some policy", policy=policy, role=name):
+                    doc = self.connection.get_role_policy(role_name, policy)["get_role_policy_response"]["get_role_policy_result"]["policy_document"]
                 document = json.dumps(json.loads(urllib.unquote(doc)), indent=2).strip()
             found[policy] = document
 
@@ -228,10 +256,12 @@ class Amazon(object):
 
     def remove_role(self, name):
         """Remove the role if it exists"""
-        if self.has_role(name):
-            log.info("Deleting role\trole=%s", name)
-            self.connection.delete_role(name)
+        role_name, _ = self.split_role_name(name)
+        if self.has_role(role_name):
+            log.info("Deleting role\trole=%s", role_name)
+            with self.catch_boto_400("Couldn't delete a role", role=role_name):
+                self.connection.delete_role(role_name)
             self.changes = True
         else:
-            log.info("Role already deleted\trole=%s", name)
+            log.info("Role already deleted\trole=%s", role_name)
 
