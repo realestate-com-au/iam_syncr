@@ -105,7 +105,7 @@ class Role(object):
 
         for key, dest in (("action", "Action"), ("notaction", "NotAction")):
             for specified in listified(policy, key):
-                listify(result, dest).append(specified.lower())
+                listify(result, dest).append(specified)
 
         for key, dest in (("resource", "Resource"), ("notresource", "NotResource")):
             for specified in listified(policy, key):
