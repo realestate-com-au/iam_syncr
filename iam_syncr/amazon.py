@@ -42,14 +42,18 @@ class Amazon(object):
             raise SyncrError("Export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY before running this script (your aws credentials)")
 
         try:
-            result = connection.get_user()
+            result = connection.list_roles()
         except boto.exception.BotoServerError as error:
             if error.status == 403:
                 raise SyncrError("Your credentials aren't allowed to look at iam :(")
             else:
                 raise
 
-        amazon_account_id = result["get_user_response"]["get_user_result"]["user"]["arn"].split(":")[4]
+        roles = result["list_roles_response"]["list_roles_result"]["roles"]
+        if not roles:
+            raise SyncrError("There are no roles in your account, I can't figure out the account id")
+
+        amazon_account_id = roles[0]['arn'].split(":")[4]
         if str(self.account_id) != str(amazon_account_id):
             raise SyncrError("Please use credentials for the right account", expect=self.account_id, got=amazon_account_id)
 
