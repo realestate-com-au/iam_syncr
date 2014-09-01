@@ -156,12 +156,18 @@ class Role(object):
         else:
             account_id = self.amazon.account_id
 
+        users = specification.get("users", [])
         for name in listified(specification, "iam"):
             if name == "__self__":
                 account_id = self.amazon.account_id
                 name = "role/{0}".format(self.name)
 
-            yield "arn:aws:iam::{0}:{1}".format(account_id, name)
+            spec = "arn:aws:iam::{0}:{1}".format(account_id, name)
+            if not users:
+                yield spec
+            else:
+                for user in users:
+                    yield "{0}/{1}".format(spec, user)
 
     def make_trust_document(self, trust, distrust):
         """Make a document for trust or None if no trust or distrust"""
