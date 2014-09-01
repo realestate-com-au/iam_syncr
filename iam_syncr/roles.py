@@ -171,10 +171,18 @@ class Role(object):
         statement = {"Sid": "", "Action": "sts:AssumeRole", "Effect": "Allow"}
 
         if trust:
-            statement["Principal"] = trust
+            statement["Principal"] = {}
+            for k, v in trust.items():
+                if isinstance(v, list) and len(v) is 1:
+                    v = v[0]
+                statement["Principal"][k] = v
 
         if distrust:
-            statement["NotPrincipal"] = distrust
+            statement["NotPrincipal"] = {}
+            for k, v in distrust.items():
+                if isinstance(v, list) and len(v) is 1:
+                    v = v[0]
+                statement["NotPrincipal"][k] = v
 
         return self.make_document([statement])
 
