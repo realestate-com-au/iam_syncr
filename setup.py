@@ -10,7 +10,7 @@ setup(
     , install_requires =
       [ "rainbow_logging_handler"
       , "pyYaml"
-      , "boto"
+      , "boto>=2.32.1"
       ]
 
     , extras_require =
