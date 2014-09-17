@@ -30,8 +30,8 @@ class Role(object):
         self.definition = definition
         self.policy_name = "syncr_policy_{0}".format(self.name.replace("/", "__"))
 
-        self.trust = {}
-        self.distrust = {}
+        self.trust = []
+        self.distrust = []
         self.permission = []
 
     def setup(self):
@@ -47,17 +47,12 @@ class Role(object):
             self.definition = MergedOptions.using(self.templates[template], self.definition)
 
         self.description = self.definition.get("description", "No description provided!")
-        for key, store in (("allow_to_assume_me", self.trust), ("disallow_to_assume_me", self.distrust)):
-            for principal in listified(self.definition, key):
-                for namespace, principal in self.make_trust_principal(principal).items():
-                    if namespace not in store:
-                        store[namespace] = set()
 
-                    if not isinstance(principal, list):
-                        principal = [principal]
+        for statement in listified(self.definition, "allow_to_assume_me"):
+            self.trust.extend(self.expand_trust_statement(statement, allow=True))
 
-                    for specified in principal:
-                        store[namespace].add(specified)
+        for statement in listified(self.definition, "disallow_to_assume_me"):
+            self.distrust.extend(self.expand_trust_statement(statement, allow=False))
 
             for namespace, vals in store.items():
                 store[namespace] = sorted(list(vals))
@@ -83,22 +78,41 @@ class Role(object):
         if self.definition.get("make_instance_profile"):
             self.amazon.make_instance_profile(self.name)
 
-    def make_trust_principal(self, principal):
+    def expand_trust_statement(self, statement, allow=False):
         """Make a trust statement"""
-        result = dict((key, val) for key, val in principal.items() if key[0].isupper())
+        result = dict((key, val) for key, val in statement.items() if key[0].isupper())
 
-        for specified in listified(principal, "service"):
+        if allow and "Principal" not in result:
+            result["Principal"] = {}
+            principal = result["Principal"]
+
+        if not allow and "NotPrincipal" not in result:
+            result["NotPrincipal"] = {}
+            principal = result["NotPrincipal"]
+
+        for specified in listified(statement, "service"):
             if specified == "ec2":
                 specified = "ec2.amazonaws.com"
-            listify(result, "Service").append(specified)
+            listify(principal, "Service").append(specified)
 
-        for specified in listified(principal, "federated"):
-            listify(result, "Federated").append(specified)
+        for specified in listified(statement, "federated"):
+            listify(principal, "Federated").extend(self.iam_arns_from_specification(specified))
+            if "Action" not in result:
+                result["Action"] = "sts:AssumeRoleWithSAML"
 
-        if "iam" in principal:
-            listify(result, "AWS").extend(self.iam_arns_from_specification(principal))
+        if "iam" in statement:
+            listify(principal, "AWS").extend(self.iam_arns_from_specification(statement))
 
-        return result
+        if "Action" not in result:
+            result["Action"] = "sts:AssumeRole"
+
+        if "Effect" not in result:
+            result["Effect"] = "Allow"
+
+        if "Sid" not in result:
+            result["Sid"] = ""
+
+        yield result
 
     def make_permission_statements(self, policy, allow=None):
         """
@@ -187,23 +201,7 @@ class Role(object):
         if not trust and not distrust:
             return
 
-        statement = {"Sid": "", "Action": "sts:AssumeRole", "Effect": "Allow"}
-
-        if trust:
-            statement["Principal"] = {}
-            for k, v in trust.items():
-                if isinstance(v, list) and len(v) is 1:
-                    v = v[0]
-                statement["Principal"][k] = v
-
-        if distrust:
-            statement["NotPrincipal"] = {}
-            for k, v in distrust.items():
-                if isinstance(v, list) and len(v) is 1:
-                    v = v[0]
-                statement["NotPrincipal"][k] = v
-
-        return self.make_document([statement])
+        return self.make_document(trust + distrust)
 
     def make_permission_document(self, permissions):
         """Return a document for these permissions, or None if no permissiosn"""

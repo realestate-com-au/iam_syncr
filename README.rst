@@ -64,8 +64,8 @@ The yaml looks something like::
 
          make_instance_profile: <boolean saying whether to make an instance profile with this role in it>
 
-         allow_to_assume_me: [<assume_role_principle]
-         disallow_to_assume_me: [<assume_role_principle]
+         allow_to_assume_me: [<assume_role_statements>]
+         disallow_to_assume_me: [<assume_role_statements>]
 
          permission: [<permission_statements>]
          deny_permission: [<permission_statemnt> where "Effect" is set to "Deny"]
@@ -91,8 +91,15 @@ Where ``<assume_role_statement>`` can be:
 ``{federated: <string>}``
    Sets the principle to ``{"Federated": <string>}``
 
+   With an ``Action`` of ``AssumeRoleWithSAML``.
+
+``{federated: <iam_specifier>}``
+   Sets the principle to ``{"Federated": <expanded iam specifier>}``
+
+   With an ``Action`` of ``AssumeRoleWithSAML``.
+
 Anything in the dictionary starting with an upper case character is included as
-is in the principle.
+is in the statement.
 
 Also, the difference between ``allow_to_assume_me`` and ``disallow_to_assume_me``
 is one sets ``Principle`` in the trust document, whereas the other sets ``NotPrinciple``.
