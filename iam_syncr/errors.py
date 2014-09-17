@@ -57,3 +57,9 @@ class BadPolicy(SyncrError):
 class BadAmazon(SyncrError):
     desc = "Amazon said no"
 
+class CantFindTemplate(SyncrError):
+    desc = "Can't find a template"
+
+class NoTemplates(SyncrError):
+    desc = "No templates defined"
+

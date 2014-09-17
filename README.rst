@@ -53,8 +53,13 @@ The yaml looks something like::
 
     ---
 
+    templates:
+      <template_name>: template
+
     roles:
       <role_name>:
+         use: <template_name>
+
          description: <optional>
 
          make_instance_profile: <boolean saying whether to make an instance profile with this role in it>

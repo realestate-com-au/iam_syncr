@@ -1,15 +1,17 @@
-from iam_syncr.errors import InvalidDocument, BadRole, BadPolicy
+from iam_syncr.errors import InvalidDocument, BadRole, BadPolicy, CantFindTemplate, NoTemplates
 from iam_syncr.helpers import listify, listified, as_list
 
+from option_merge import MergedOptions
 import logging
 import json
 
 log = logging.getLogger("iam_syncr.roles")
 
 class RoleRemoval(object):
-    def __init__(self, name, amazon):
+    def __init__(self, name, amazon, templates=None):
         self.name = name
         self.amazon = amazon
+        self.templates = templates
 
     def setup(self):
         """Make sure our name is a string"""
@@ -21,9 +23,10 @@ class RoleRemoval(object):
         self.amazon.remove_role(self.name)
 
 class Role(object):
-    def __init__(self, name, definition, amazon):
+    def __init__(self, name, definition, amazon, templates=None):
         self.name = name
         self.amazon = amazon
+        self.templates = templates
         self.definition = definition
         self.policy_name = "syncr_policy_{0}".format(self.name.replace("/", "__"))
 
@@ -33,6 +36,16 @@ class Role(object):
 
     def setup(self):
         """Raise errors if the definition doesn't make sense"""
+        if "use" in self.definition:
+            template = self.definition["use"]
+            if not self.templates:
+                raise NoTemplates(name=name, looking_for_template=template, available=self.templates.keys())
+
+            if template not in self.templates:
+                raise CantFindTemplate(name=self.name, looking_for_template=template, available=self.templates.keys())
+
+            self.definition = MergedOptions.using(self.templates[template], self.definition)
+
         self.description = self.definition.get("description", "No description provided!")
         for key, store in (("allow_to_assume_me", self.trust), ("disallow_to_assume_me", self.distrust)):
             for principal in listified(self.definition, key):

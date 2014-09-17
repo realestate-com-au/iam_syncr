@@ -6,6 +6,18 @@ import logging
 
 log = logging.getLogger("iam_syncr.syncr")
 
+class Template(object):
+    """Thin wrapper to hold templates"""
+    def __init__(self, name, template, *args, **kwargs):
+        self.name = name
+        self.template = template
+
+    def setup(self):
+        pass
+
+    def resolve(self):
+        pass
+
 class Sync(object):
     """Knows how to interpret configuration for syncing"""
 
@@ -13,21 +25,29 @@ class Sync(object):
         self.amazon = amazon
 
         self.types = {}
+        self.the_types = []
+        self.templates = {}
         self.configurations = defaultdict(list)
 
     def sync(self, combined):
         """Let's do this!"""
-        for name in self.types:
+        for _, name in sorted(self.the_types):
             if name in combined:
                 things = self.create_things(combined[name], name)
                 self.setup_and_resolve(things)
 
+                # Special case the templates
+                if name == "templates":
+                    for template in things:
+                        self.templates[template.name] = template.template
+
     def register_default_types(self):
         """Register the default things syncr looks for"""
-        self.register_type("roles", dict, Role, key_conflicts_with=["remove_roles"])
-        self.register_type("remove_roles", list, RoleRemoval, key_conflicts_with=["roles"])
+        self.register_type("templates", dict, Template, priority=0)
+        self.register_type("remove_roles", list, RoleRemoval, key_conflicts_with=["roles"], priority=10)
+        self.register_type("roles", dict, Role, key_conflicts_with=["remove_roles"], priority=20)
 
-    def register_type(self, name, typ, kls, key_conflicts_with=None):
+    def register_type(self, name, typ, kls, key_conflicts_with=None, priority=None):
         """
         Register a type to be synced
 
@@ -36,14 +56,15 @@ class Sync(object):
         if key_conflicts_with and not isinstance(key_conflicts_with, list):
             key_conflicts_with = [key_conflicts_with]
         self.types[name] = (typ, key_conflicts_with, kls)
+        self.the_types.append((priority, name))
 
     def create_things(self, things, name):
         """Creates a list of Role objects from a roles_doc"""
         typ, _, kls = self.types[name]
         if typ is list:
-            return [kls(thing, self.amazon) for thing in things]
+            return [kls(thing, self.amazon, self.templates) for thing in things]
         else:
-            return [kls(thing, val, self.amazon) for thing, val in things.items()]
+            return [kls(thing, val, self.amazon, self.templates) for thing, val in things.items()]
 
     def setup_and_resolve(self, things):
         """Runs setup on all the provided things and once they are setup, resolve them"""

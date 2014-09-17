@@ -11,6 +11,7 @@ setup(
       [ "rainbow_logging_handler"
       , "pyYaml"
       , "boto>=2.32.1"
+      , "option_merge==0.7"
       ]
 
     , extras_require =
