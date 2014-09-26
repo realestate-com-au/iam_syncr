@@ -79,6 +79,17 @@ class Amazon(object):
             else:
                 raise
 
+    @contextmanager
+    def ignore_boto_404(self):
+        """Ignore a BotoServerError 404"""
+        try:
+            yield
+        except boto.exception.BotoServerError as error:
+            if error.status == 404:
+                pass
+            else:
+                raise
+
     def print_change(self, symbol, typ, **kwargs):
         """Print out a change"""
         values = ", ".join("{0}={1}".format(key, val) for key, val in sorted(kwargs.items()))
@@ -122,10 +133,12 @@ class Amazon(object):
 
     def info_for_profile(self, name):
         """Return what roles are attached to this profile if it exists"""
+        profiles = []
         role_name, _ = self.split_role_name(name)
-        with self.catch_boto_400("Couldn't list instance profiles associated with a role", role=role_name):
-            result = self.connection.list_instance_profiles_for_role(role_name)
-        profiles = result["list_instance_profiles_for_role_response"]["list_instance_profiles_for_role_result"]["instance_profiles"]
+        with self.ignore_boto_404():
+            with self.catch_boto_400("Couldn't list instance profiles associated with a role", role=role_name):
+                result = self.connection.list_instance_profiles_for_role(role_name)
+            profiles = result["list_instance_profiles_for_role_response"]["list_instance_profiles_for_role_result"]["instance_profiles"]
 
         existing_profile = None
         for profile in profiles:
@@ -145,7 +158,6 @@ class Amazon(object):
         existing_roles_in_profile = self.info_for_profile(role_name)
         if existing_roles_in_profile is None:
             try:
-                log.info("Making instance profile\tname=%s", role_name)
                 with self.catch_boto_400("Couldn't create instance profile", instance_profile=role_name):
                     for _ in self.change("+", "instance_profile", profile=role_name):
                         self.connection.create_instance_profile(role_name)
@@ -165,7 +177,7 @@ class Amazon(object):
 
         if not existing_roles_in_profile or not any(rl == role_name for rl in existing_roles_in_profile):
             with self.catch_boto_400("Couldn't add role to an instance profile", role=role_name, instance_profile=role_name):
-                for _ in self.change("+", "instance_profile_role", profile=role_name, role=role):
+                for _ in self.change("+", "instance_profile_role", profile=role_name, role=role_name):
                     self.connection.add_role_to_instance_profile(role_name, role_name)
 
     def create_role(self, name, trust_document, policies=None):
