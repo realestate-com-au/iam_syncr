@@ -62,6 +62,11 @@ def make_parser():
         , action = "append"
         )
 
+    parser.add_argument("--dry-run"
+        , help = "Print out what policies would be set/removed"
+        , action = "store_true"
+        )
+
     return parser
 
 def accounts_from(location):
@@ -83,7 +88,7 @@ def accounts_from(location):
 
     return accounts
 
-def make_amazon(folder, accounts_location=None):
+def make_amazon(folder, accounts_location=None, dry_run=False):
     """Find the account we're using and return a setup Amazon object"""
     if not accounts_location:
         accounts_location = os.path.join(folder, '..', 'accounts.yaml')
@@ -95,7 +100,7 @@ def make_amazon(folder, accounts_location=None):
         raise SyncrError("Please add this account to accounts.yaml", accounts_yaml_location=accounts_location, account_name=account_name)
     account_id = accounts[account_name]
 
-    amazon = Amazon(account_id, account_name, accounts)
+    amazon = Amazon(account_id, account_name, accounts, dry_run=dry_run)
     amazon.setup()
 
     return amazon
@@ -181,7 +186,7 @@ def main(argv=None):
 
     try:
         log.info("Making a connection to amazon")
-        amazon = make_amazon(folder=args.folder, accounts_location=args.accounts_location)
+        amazon = make_amazon(folder=args.folder, accounts_location=args.accounts_location, dry_run=args.dry_run)
 
         log.info("Finding the configuration")
         found = find_configurations(args.folder, args.filename_match)

@@ -28,8 +28,9 @@ class Amazon(object):
         if app_name not in useragent:
             sys.modules["boto.connection"].UserAgent = "{0} {1}/{2}".format(useragent, app_name, version)
 
-    def __init__(self, account_id, account_name, accounts):
+    def __init__(self, account_id, account_name, accounts, dry_run=False):
         self.changes = False
+        self.dry_run = dry_run
         self.accounts = accounts
         self.account_id = account_id
         self.account_name = account_name
