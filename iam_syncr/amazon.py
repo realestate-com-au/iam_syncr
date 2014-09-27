@@ -219,6 +219,21 @@ class Amazon(object):
         except (ValueError, TypeError):
             return
 
+        # Ordering the principals because the ordering amazon gives me hates me
+        def sort_statement(statement):
+            if "Principal" in statement:
+                principal = statement["Principal"]
+                for principal_type in ("AWS", "Federated", "Service"):
+                    if principal_type in principal and type(principal[principal_type]) is list:
+                        principal[principal_type] = sorted(principal[principal_type])
+        for document in (first, second):
+            if "Statement" in document:
+                if type(document["Statement"]) is dict:
+                    sort_statement(document["Statement"])
+                else:
+                    for statement in document["Statement"]:
+                        sort_statement(statement)
+
         difference = list(diff(first, second))
         if difference:
             for typ, location, lines in difference:

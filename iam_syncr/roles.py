@@ -106,8 +106,11 @@ class Role(object):
         # Amazon gets rid of the lists if only one item
         # And this mucks around with the diffing....
         for principal_type in ("AWS", "Federated", "Service"):
-            if principal_type in principal and len(principal[principal_type]) == 1:
-                principal[principal_type] = principal[principal_type][0]
+            if principal_type in principal:
+                if len(principal[principal_type]) == 1:
+                    principal[principal_type] = principal[principal_type][0]
+                else:
+                    principal[principal_type] = sorted(principal[principal_type])
 
         if "Action" not in result:
             result["Action"] = "sts:AssumeRole"
