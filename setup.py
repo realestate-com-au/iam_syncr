@@ -12,6 +12,7 @@ setup(
       , "pyYaml"
       , "boto>=2.32.1"
       , "option_merge==0.7"
+      , "dictdiffer"
       ]
 
     , extras_require =

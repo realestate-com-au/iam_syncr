@@ -2,6 +2,7 @@ from iam_syncr.errors import SyncrError, BadAmazon
 
 from boto.iam.connection import IAMConnection
 from contextlib import contextmanager
+from dictdiffer import diff
 import logging
 import urllib
 import json
@@ -90,10 +91,13 @@ class Amazon(object):
             else:
                 raise
 
-    def print_change(self, symbol, typ, **kwargs):
+    def print_change(self, symbol, typ, changes=None, **kwargs):
         """Print out a change"""
         values = ", ".join("{0}={1}".format(key, val) for key, val in sorted(kwargs.items()))
         print("{0} {1}({2})".format(symbol, typ, values))
+        if changes:
+            for change in changes:
+                print("\n".join("\t{0}".format(line) for line in change.split('\n')))
 
     def change(self, symbol, typ, **kwargs):
         """Print out a change and then do the change if not doing a dry run"""
@@ -192,13 +196,13 @@ class Amazon(object):
             for policy_name, document in policies.items():
                 if document:
                     with self.catch_boto_400("Couldn't add policy", "{0} - {1} Permission document".format(role_name, policy_name), document, role=role_name, policy_name=policy_name):
-                        for _ in self.change("M", "role_policy", role=role_name, policy=policy_name):
+                        for _ in self.change("+", "role_policy", role=role_name, policy=policy_name, document=document):
                             self.connection.put_role_policy(role_name, policy_name, document)
 
     def compare_trust_document(self, role_info, trust_document):
         """Say whether the provided trust document is the same as the one in the role_info"""
         if not role_info or not role_info.get("role", {}).get("assume_role_policy_document"):
-            return False
+            return []
 
         unquoted = urllib.unquote(role_info["role"]["assume_role_policy_document"])
         return self.compare_two_documents(unquoted, trust_document)
@@ -206,24 +210,39 @@ class Amazon(object):
     def compare_two_documents(self, doc1, doc2):
         """Compare two documents by converting them into json objects and back to strings and compare"""
         try:
-            first = json.dumps(json.loads(doc1), indent=2, sort_keys=True).strip()
+            first = json.loads(doc1)
         except (ValueError, TypeError):
-            return False
+            return
 
         try:
-            second = json.dumps(json.loads(doc2), indent=2, sort_keys=True).strip()
+            second = json.loads(doc2)
         except (ValueError, TypeError):
-            return False
+            return
 
-        return first == second
+        difference = list(diff(first, second))
+        if difference:
+            for typ, location, lines in difference:
+                if isinstance(location, basestring):
+                    joined_location = location
+                else:
+                    joined_location = [location[0]]
+                    for part in location[1:]:
+                        if type(part) is int:
+                            joined_location.append("[{0}]".format(part))
+                        else:
+                            joined_location.append(".{0}".format(part))
+                    joined_location = "".join(joined_location)
+                yield "{0} {1}\n\t{2}".format(typ, joined_location, "\n\t".join(str(line) for line in lines))
 
     def modify_role(self, role_info, name, trust_document, policies=LeaveAlone):
         """Modify a role"""
         role_name, _ = self.split_role_name(name)
-        if trust_document and not self.compare_trust_document(role_info, trust_document):
-            with self.catch_boto_400("Couldn't modify trust document", "{0} assume document".format(role_name), trust_document, role=role_name):
-                for _ in self.change("M", "trust_document", role=role_name):
-                    self.connection.update_assume_role_policy(role_name, trust_document)
+        if trust_document:
+            changes = list(self.compare_trust_document(role_info, trust_document))
+            if changes:
+                with self.catch_boto_400("Couldn't modify trust document", "{0} assume document".format(role_name), trust_document, role=role_name):
+                    for _ in self.change("M", "trust_document", role=role_name, changes=changes):
+                        self.connection.update_assume_role_policy(role_name, trust_document)
 
         if policies is LeaveAlone:
             return
@@ -250,8 +269,11 @@ class Amazon(object):
                             self.connection.delete_role_policy(role_name, policy)
             else:
                 needed = False
+                changes = None
+
                 if policy in current_policies:
-                    if not self.compare_two_documents(current_policies.get(policy), document):
+                    changes = list(self.compare_two_documents(current_policies.get(policy), document))
+                    if changes:
                         log.info("Overriding existing policy\trole=%s\tpolicy=%s", role_name, policy)
                         needed = True
                 else:
@@ -260,7 +282,8 @@ class Amazon(object):
 
                 if needed:
                     with self.catch_boto_400("Couldn't add policy document", "{0} - {1} policy document".format(role_name, policy), document, role=role_name, policy=policy):
-                        for _ in self.change("+", "role_policy", role=role_name, policy=policy):
+                        symbol = "M" if changes else "+"
+                        for _ in self.change(symbol, "role_policy", role=role_name, policy=policy, changes=changes):
                             self.connection.put_role_policy(role_name, policy, document)
                             log.debug(policy)
                             log.debug(document)
