@@ -48,8 +48,8 @@ describe TestCase, "Role":
         self.assertIs(role.amazon, amazon)
         self.assertIs(role.definition, definition)
 
-        self.assertEqual(role.trust, {})
-        self.assertEqual(role.distrust, {})
+        self.assertEqual(role.trust, [])
+        self.assertEqual(role.distrust, [])
         self.assertEqual(role.permission, [])
 
     describe "Setup":
@@ -88,8 +88,8 @@ describe TestCase, "Role":
 
             # With lists of principals
             role = Role(self.name, {"allow_to_assume_me": allow_to_assume_me, "disallow_to_assume_me": disallow_to_assume_me}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
             with mock.patch.object(role, "make_trust_principal", fake_make_trust_principal):
                 role.setup()
             self.assertSortedEqual(role.trust, {"AWS": [tprinc1, tprinc2], "Service": [tprinc3]})
@@ -97,8 +97,8 @@ describe TestCase, "Role":
 
             # And not giving lists
             role = Role(self.name, {"allow_to_assume_me": princ1, "disallow_to_assume_me": princ2}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
             with mock.patch.object(role, "make_trust_principal", fake_make_trust_principal):
                 role.setup()
             self.assertSortedEqual(role.trust, {"AWS": [tprinc1, tprinc2]})
@@ -135,24 +135,24 @@ describe TestCase, "Role":
 
             # With lists of polipals
             role = Role(self.name, {"allow_permission": allow_permission, "deny_permission": deny_permission, "permission": permission}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
             with mock.patch.object(role, "make_permission_statements", fake_make_permission_statements):
                 role.setup()
             self.assertEqual(role.permission, [(tpol3, None), (tpol1, True), (tpol1b, True), (tpol2, True), (tpol4, False), (tpol5, False), (tpol6, False)])
 
             # And not giving lists
             role = Role(self.name, {"allow_permission": pol1, "deny_permission": pol2, "permission": pol3}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
             with mock.patch.object(role, "make_permission_statements", fake_make_permission_statements):
                 role.setup()
             self.assertEqual(role.permission, [(tpol3, None), (tpol1, True), (tpol1b, True), (tpol2, False)])
 
             # And with only allow
             role = Role(self.name, {"allow_permission": pol1}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
             with mock.patch.object(role, "make_permission_statements", fake_make_permission_statements):
                 role.setup()
             self.assertEqual(role.permission, [(tpol1, True), (tpol1b, True)])
@@ -341,17 +341,17 @@ describe TestCase, "Role":
 
         it "sets Action and NotAction from action and notaction":
             for key, dest in (("action", "Action"), ("notaction", "NotAction")):
-                policy = {"Resource": "resource", key: "StuFF"}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["stuff"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["stuff"]}])
+                policy = {"Resource": "resource", key: "Stuff"}
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff"]}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff"]}])
 
-                policy = {"Resource": "resource", key: ["StuFF"]}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["stuff"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["stuff"]}])
+                policy = {"Resource": "resource", key: ["Stuff"]}
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff"]}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff"]}])
 
-                policy = {"Resource": "resource", key: ["StuFF", "OtHer:*"]}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["stuff", "other:*"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["stuff", "other:*"]}])
+                policy = {"Resource": "resource", key: ["Stuff", "otHer:*"]}
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff", "otHer:*"]}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff", "otHer:*"]}])
 
         it "sets Resource and NotResource from resource and notresource":
             res1, tres1 = mock.Mock(name="res1"), mock.Mock(name="tres1")

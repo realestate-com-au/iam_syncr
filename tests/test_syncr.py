@@ -13,6 +13,8 @@ describe TestCase, "Sync":
     before_each:
         self.amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True)
         self.sync = Sync(self.amazon)
+        self.sync.templates = mock.Mock(name="templates")
+        self.templates = self.sync.templates
 
     it "takes in an amazon object and inits types and configurations":
         amazon = mock.Mock(name="amazon")
@@ -74,8 +76,8 @@ describe TestCase, "Sync":
                 }
 
             kls = mock.Mock(name="kls")
-            def instantiate(thing, amazon):
-                called.append((thing, amazon))
+            def instantiate(thing, amazon, templates):
+                called.append((thing, amazon, templates))
                 return created[thing]
             kls.side_effect = instantiate
 
@@ -83,7 +85,7 @@ describe TestCase, "Sync":
             things = ["one", "two", "three"]
 
             self.assertEqual(self.sync.create_things(things, "blah"), [created["one"], created["two"], created["three"]])
-            self.assertEqual(called, [("one", self.amazon), ("two", self.amazon), ("three", self.amazon)])
+            self.assertEqual(called, [("one", self.amazon, self.templates), ("two", self.amazon, self.templates), ("three", self.amazon, self.templates)])
 
         it "instantiates the kls with thing and value if a dict":
             called = []
@@ -94,8 +96,8 @@ describe TestCase, "Sync":
                 }
 
             kls = mock.Mock(name="kls")
-            def instantiate(thing, val, amazon):
-                called.append((thing, val, amazon))
+            def instantiate(thing, val, amazon, templates):
+                called.append((thing, val, amazon, templates))
                 return created[thing]
             kls.side_effect = instantiate
 
@@ -103,7 +105,7 @@ describe TestCase, "Sync":
             things = {"one": "one_val", "two": "two_val", "three": "three_val"}
 
             self.assertEqual(set(self.sync.create_things(things, "blah")), set([created["one"], created["two"], created["three"]]))
-            self.assertEqual(set(called), set([("one", "one_val", self.amazon), ("two", "two_val", self.amazon), ("three", "three_val", self.amazon)]))
+            self.assertEqual(set(called), set([("one", "one_val", self.amazon, self.templates), ("two", "two_val", self.amazon, self.templates), ("three", "three_val", self.amazon, self.templates)]))
 
     describe "setup and resolve":
         it "calls setup on all the things and then calls resolve on all the things":
@@ -316,7 +318,7 @@ describe TestCase, "Sync":
         it "complains about duplicates in a list":
             combined = {}
             errors = self.sync.add_to_combined(combined, "key2", list, ["one", "two", "one", "three", "four", "four"], "somewhere2")
-            self.assertEqual(errors, [InvalidConfiguration("Found duplicates in a list", key="key2", location="somewhere2", duplicates=["one", "four"])])
+            self.assertEqual(errors, [InvalidConfiguration("Found duplicates in a list", key="key2", location="somewhere2", duplicates=set(["one", "four"]))])
             self.assertEqual(combined, {"key2": {}})
 
         it "records list as a dict of {<thing>: (<location>, )}":

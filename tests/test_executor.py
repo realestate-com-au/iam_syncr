@@ -88,7 +88,7 @@ describe TestCase, "Making Amazon object":
                     instance = executor.make_amazon(folder)
 
         self.assertIs(instance, amazon_instance)
-        fakeAmazon.assert_called_once_with(12, "dev", accounts)
+        fakeAmazon.assert_called_once_with(12, "dev", accounts, dry_run=False)
         amazon_instance.setup.assert_called_once()
 
         # Mock probably makes it easier to do this check, I'll come back to it another day
@@ -115,7 +115,7 @@ describe TestCase, "Making Amazon object":
                     instance = executor.make_amazon(folder, accounts_location)
 
         self.assertIs(instance, amazon_instance)
-        fakeAmazon.assert_called_once_with(32, "staging", accounts)
+        fakeAmazon.assert_called_once_with(32, "staging", accounts, dry_run=False)
         amazon_instance.setup.assert_called_once()
         fake_accounts_from.assert_called_once_with(accounts_location)
 
