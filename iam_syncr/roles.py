@@ -198,7 +198,8 @@ class Role(object):
                 account_id = self.amazon.account_id
                 name = "role/{0}".format(self.name)
 
-            spec = "arn:aws:iam::{0}:{1}".format(account_id, name)
+            service = "sts" if name.startswith("assumed-role") else "iam"
+            spec = "arn:aws:{0}::{1}:{2}".format(service, account_id, name)
             if not users:
                 yield spec
             else:
