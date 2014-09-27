@@ -1,3 +1,4 @@
+from unittest import TestCase as UnitTestTestCase
 from contextlib import contextmanager
 import tempfile
 import shutil
@@ -29,4 +30,8 @@ def a_directory(removed=False):
     finally:
         if location and os.path.exists(location):
             shutil.rmtree(location)
+
+class TestCase(UnitTestTestCase):
+    def assertSortedEqual(self, listone, listtwo):
+        self.assertEqual(sorted(listone), sorted(listtwo))
 

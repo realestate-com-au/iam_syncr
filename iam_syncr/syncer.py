@@ -146,9 +146,8 @@ class Sync(object):
                         if all(identity not in complained_about for identity in identities):
                             location_to_keys = defaultdict(set)
                             for key in [name] + conflicting:
-                                for values in combined[key].values():
-                                    for vals in values:
-                                        location_to_keys[vals[0]].add(key)
+                                for vals in combined[key][thing]:
+                                    location_to_keys[vals[0]].add(key)
 
                             found_in = "; ".join(sorted("{0}({1})".format(location, ', '.join(sorted(list(keys)))) for location, keys in location_to_keys.items()))
                             errors.append(ConflictingConfiguration("Found item in conflicting specifications", conflicting=thing, found_in=found_in))

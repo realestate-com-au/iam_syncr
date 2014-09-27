@@ -5,8 +5,9 @@ from iam_syncr.amazon import Amazon
 from iam_syncr.syncer import Sync
 
 from noseOfYeti.tokeniser.support import noy_sup_setUp
-from unittest import TestCase
 import mock
+
+from tests.helpers import TestCase
 
 describe TestCase, "Sync":
     before_each:
@@ -295,9 +296,9 @@ describe TestCase, "Sync":
                 }
 
             errors = self.sync.find_conflicting(combined)
-            self.assertEqual(errors
+            self.assertSortedEqual(errors
                 , [ ConflictingConfiguration("Found item in conflicting specifications", conflicting="one", found_in="somewhere(key); somewhere2(key2)")
-                  , ConflictingConfiguration("Found item in conflicting specifications", conflicting="three", found_in="somewhere3(key); somewhere3(key2, key3)")
+                  , ConflictingConfiguration("Found item in conflicting specifications", conflicting="three", found_in="somewhere3(key, key2, key3)")
                   ]
                 )
 
