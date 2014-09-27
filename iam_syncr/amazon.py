@@ -91,13 +91,15 @@ class Amazon(object):
             else:
                 raise
 
-    def print_change(self, symbol, typ, changes=None, **kwargs):
+    def print_change(self, symbol, typ, changes=None, document=None, **kwargs):
         """Print out a change"""
         values = ", ".join("{0}={1}".format(key, val) for key, val in sorted(kwargs.items()))
         print("{0} {1}({2})".format(symbol, typ, values))
         if changes:
             for change in changes:
                 print("\n".join("\t{0}".format(line) for line in change.split('\n')))
+        elif document:
+            print("\n".join("\t{0}".format(line) for line in document.split('\n')))
 
     def change(self, symbol, typ, **kwargs):
         """Print out a change and then do the change if not doing a dry run"""
@@ -188,7 +190,7 @@ class Amazon(object):
         """Create a role"""
         role_name, role_path = self.split_role_name(name)
         with self.catch_boto_400("Couldn't create role", "{0} trust document".format(name), trust_document, role=name):
-            for _ in self.change("+", "role", role=role_name):
+            for _ in self.change("+", "role", role=role_name, document=trust_document):
                 self.connection.create_role(role_name, assume_role_policy_document=trust_document, path=role_path)
 
         # And add our permissions
@@ -297,11 +299,8 @@ class Amazon(object):
                 if needed:
                     with self.catch_boto_400("Couldn't add policy document", "{0} - {1} policy document".format(role_name, policy), document, role=role_name, policy=policy):
                         symbol = "M" if changes else "+"
-                        for _ in self.change(symbol, "role_policy", role=role_name, policy=policy, changes=changes):
+                        for _ in self.change(symbol, "role_policy", role=role_name, policy=policy, changes=changes, document=document):
                             self.connection.put_role_policy(role_name, policy, document)
-                            log.debug(policy)
-                            log.debug(document)
-                            log.debug('------')
 
     def current_role_policies(self, name, comparing):
         """Get the current policies for some role"""
