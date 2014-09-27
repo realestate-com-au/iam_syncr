@@ -143,13 +143,24 @@ Where ``<iam_specifer>`` can be:
 
    Where account is retrieved from our accounts dictionary from accounts.yaml
 
+Dry Run
+=======
+
+You can use the ``--dry-run`` option to make iam_syncr tell you what changes will
+be made without making those changes.
+
+It will print out the changes to stdout.
+
+Lines starting with "+" indicate additions, lines starting with "-" indicate
+deletions and lines starting with "M" indicate modifications.
+
+Modifications are followed by an indented diff of the differences to be made.
+
 The Future
 ==========
 
 In order of importance:
 
-* Ordering so roles are created before roles are modified
-* Add a --noop option
 * More Tests
 * Support editing users and groups
 
