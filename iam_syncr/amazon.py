@@ -221,18 +221,25 @@ class Amazon(object):
 
         # Ordering the principals because the ordering amazon gives me hates me
         def sort_statement(statement):
-            if "Principal" in statement:
-                principal = statement["Principal"]
-                for principal_type in ("AWS", "Federated", "Service"):
-                    if principal_type in principal and type(principal[principal_type]) is list:
-                        principal[principal_type] = sorted(principal[principal_type])
+            for principal in (statement.get("Principal", None), statement.get("NotPrincipal", None)):
+                if principal:
+                    for principal_type in ("AWS", "Federated", "Service"):
+                        if principal_type in principal and type(principal[principal_type]) is list:
+                            principal[principal_type] = sorted(principal[principal_type])
+        def sort_key(statement, key):
+            if key in statement and type(statement[key]) is list:
+                statement[key] = sorted(statement[key])
         for document in (first, second):
             if "Statement" in document:
                 if type(document["Statement"]) is dict:
                     sort_statement(document["Statement"])
+                    sort_key(document["Statement"], "Resource")
+                    sort_key(document["Statement"], "NotResource")
                 else:
                     for statement in document["Statement"]:
                         sort_statement(statement)
+                        sort_key(statement, "Resource")
+                        sort_key(statement, "NotResource")
 
         difference = list(diff(first, second))
         if difference:
