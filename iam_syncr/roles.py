@@ -103,6 +103,12 @@ class Role(object):
         if "iam" in statement:
             listify(principal, "AWS").extend(self.iam_arns_from_specification(statement))
 
+        # Amazon gets rid of the lists if only one item
+        # And this mucks around with the diffing....
+        for principal_type in ("AWS", "Federated", "Service"):
+            if principal_type in principal and len(principal[principal_type]) == 1:
+                principal[principal_type] = principal[principal_type][0]
+
         if "Action" not in result:
             result["Action"] = "sts:AssumeRole"
 
