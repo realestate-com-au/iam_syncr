@@ -2,7 +2,7 @@ from iam_syncr.errors import SyncrError, BadAmazon
 
 from boto.iam.connection import IAMConnection
 from contextlib import contextmanager
-from dictdiffer import diff
+from datadiff import diff
 import logging
 import urllib
 import json
@@ -241,20 +241,12 @@ class Amazon(object):
                         sort_key(statement, "Resource")
                         sort_key(statement, "NotResource")
 
-        difference = list(diff(first, second))
+        difference = diff(first, second, fromfile="current", tofile="new").stringify()
         if difference:
-            for typ, location, lines in difference:
-                if isinstance(location, basestring):
-                    joined_location = location
-                else:
-                    joined_location = [location[0]]
-                    for part in location[1:]:
-                        if type(part) is int:
-                            joined_location.append("[{0}]".format(part))
-                        else:
-                            joined_location.append(".{0}".format(part))
-                    joined_location = "".join(joined_location)
-                yield "{0} {1}\n\t{2}".format(typ, joined_location, "\n\t".join(str(line) for line in lines))
+            lines = difference.split('\n')
+            if any(line.strip().startswith("@@") and line.strip().endswith("@@") for line in lines):
+                for line in lines:
+                    yield line
 
     def modify_role(self, role_info, name, trust_document, policies=LeaveAlone):
         """Modify a role"""
