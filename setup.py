@@ -13,6 +13,7 @@ setup(
       , "boto>=2.32.1"
       , "option_merge==0.7"
       , "datadiff"
+      , "delfick_error"
       ]
 
     , extras_require =
