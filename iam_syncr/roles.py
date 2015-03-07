@@ -40,7 +40,7 @@ class Role(object):
         if "use" in self.definition:
             template = self.definition["use"]
             if not self.templates:
-                raise NoTemplates(name=name, looking_for_template=template, available=self.templates.keys())
+                raise NoTemplates(name=self.name, looking_for_template=template, available=self.templates.keys())
 
             if template not in self.templates:
                 raise CantFindTemplate(name=self.name, looking_for_template=template, available=self.templates.keys())
