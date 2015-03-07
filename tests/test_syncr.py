@@ -1,7 +1,7 @@
 # coding: spec
 
 from iam_syncr.errors import SyncrError, BadConfiguration, DuplicateItem, ConflictingConfiguration, InvalidConfiguration
-from iam_syncr.amazon import Amazon
+from iam_syncr.amazon.base import Amazon
 from iam_syncr.syncer import Sync
 
 from noseOfYeti.tokeniser.support import noy_sup_setUp

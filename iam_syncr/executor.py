@@ -1,5 +1,5 @@
 from iam_syncr.errors import SyncrError, BadConfiguration, InvalidConfiguration, NoConfiguration
-from iam_syncr.amazon import Amazon
+from iam_syncr.amazon.base import Amazon
 from iam_syncr.syncer import Sync
 from iam_syncr import VERSION
 

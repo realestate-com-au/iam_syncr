@@ -2,7 +2,7 @@
 
 from iam_syncr.errors import BadRole, BadPolicy, InvalidDocument
 from iam_syncr.roles import RoleRemoval, Role
-from iam_syncr.amazon import Amazon
+from iam_syncr.amazon.base import Amazon
 
 from noseOfYeti.tokeniser.support import noy_sup_setUp
 from textwrap import dedent
