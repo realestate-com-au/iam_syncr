@@ -1,6 +1,7 @@
 from iam_syncr.errors import SyncrError
 
 from boto.iam.connection import IAMConnection
+from boto.s3.connection import S3Connection
 import logging
 import boto
 import sys
@@ -57,4 +58,13 @@ class Amazon(object):
         # If reached this far, the credentials belong to the correct account :)
         self.connection = connection
         return connection
+
+    @property
+    def s3_connection(self):
+        if getattr(self, "_s3_connection", None) is None:
+            try:
+                self._s3_connection = S3Connection()
+            except boto.exception.NoAuthHandlerFound:
+                raise SyncrError("Export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY before running this script (your aws credentials)")
+        return self._s3_connection
 

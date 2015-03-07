@@ -1,5 +1,6 @@
 from iam_syncr.errors import SyncrError, InvalidConfiguration, ConflictingConfiguration, BadConfiguration, DuplicateItem
 from iam_syncr.roles import Role, RoleRemoval
+from iam_syncr.buckets import Bucket
 
 from collections import defaultdict
 import logging
@@ -46,6 +47,7 @@ class Sync(object):
         self.register_type("templates", dict, Template, priority=0)
         self.register_type("remove_roles", list, RoleRemoval, key_conflicts_with=["roles"], priority=10)
         self.register_type("roles", dict, Role, key_conflicts_with=["remove_roles"], priority=20)
+        self.register_type("buckets", dict, Bucket, priority=30)
 
     def register_type(self, name, typ, kls, key_conflicts_with=None, priority=None):
         """
@@ -59,7 +61,7 @@ class Sync(object):
         self.the_types.append((priority, name))
 
     def create_things(self, things, name):
-        """Creates a list of Role objects from a roles_doc"""
+        """Creates a list of objects"""
         typ, _, kls = self.types[name]
         if typ is list:
             return [kls(thing, self.amazon, self.templates) for thing in things]
