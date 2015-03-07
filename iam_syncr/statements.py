@@ -115,6 +115,11 @@ class Statements(object):
 
         elif "s3" in resource:
             for bucket_key in listify(resource, "s3"):
+                if bucket_key == "__self__":
+                    if self.self_type == "role":
+                        raise BadPolicy("Role policy has no __self__ bucket", role=self.name)
+                    else:
+                        bucket_key = self.name
                 yield "arn:aws:s3:::{0}".format(bucket_key)
                 if '/' not in bucket_key:
                     yield "arn:aws:s3:::{0}/*".format(bucket_key)

@@ -14,8 +14,8 @@ from tests.helpers import TestCase
 
 describe TestCase, "Statements":
     before_each:
-        self.name = uuid.uuid1()
-        self.account_id = uuid.uuid1()
+        self.name = str(uuid.uuid1())
+        self.account_id = str(uuid.uuid1())
         self.accounts = {"prod": self.account_id, self.account_id: self.account_id}
         self.statements = Statements(self.name, 'role', self.account_id, self.accounts)
 
@@ -235,6 +235,10 @@ describe TestCase, "Statements":
         it "uses s3 as bucket and key":
             self.assertEqual(list(self.statements.expand_resource({"s3": "bucket/key"})), ["arn:aws:s3:::bucket/key"])
             self.assertEqual(list(self.statements.expand_resource({"s3": ["bucket1/key", "bucket2/key"]})), ["arn:aws:s3:::bucket1/key", "arn:aws:s3:::bucket2/key"])
+
+        it "uses current name as bucket if using __self__ with s3":
+            self.statements.self_type = "bucket"
+            self.assertEqual(list(self.statements.expand_resource({"s3": "__self__"})), ["arn:aws:s3:::{0}".format(self.name), "arn:aws:s3:::{0}/*".format(self.name)])
 
         it "sets resources as bucket and bucket/* if / not in bucket_key":
             self.assertEqual(list(self.statements.expand_resource({"s3": "bucket"})), ["arn:aws:s3:::bucket", "arn:aws:s3:::bucket/*"])
