@@ -11,7 +11,7 @@ log = logging.getLogger("iam_syncr.amazon.roles")
 class AmazonRoles(object, AmazonMixin):
     def __init__(self, amazon):
         self.amazon = amazon
-        self.documents = AmazonDocuments
+        self.documents = AmazonDocuments()
         self.connection = amazon.connection
 
     def split_role_name(self, name):
