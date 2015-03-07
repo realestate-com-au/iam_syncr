@@ -4,6 +4,7 @@ from iam_syncr.helpers import listify, listified, as_list
 from option_merge import MergedOptions
 import logging
 import json
+import six
 
 log = logging.getLogger("iam_syncr.roles")
 
@@ -54,9 +55,6 @@ class Role(object):
         for statement in listified(self.definition, "disallow_to_assume_me"):
             self.distrust.extend(self.expand_trust_statement(statement, allow=False))
 
-            for namespace, vals in store.items():
-                store[namespace] = sorted(list(vals))
-
         for key, default_allow in (("permission", None), ("allow_permission", True), ("deny_permission", False)):
             for policy in listified(self.definition, key):
                 for statement in self.make_permission_statements(policy, allow=default_allow):
@@ -105,12 +103,14 @@ class Role(object):
 
         # Amazon gets rid of the lists if only one item
         # And this mucks around with the diffing....
-        for principal_type in ("AWS", "Federated", "Service"):
-            if principal_type in principal:
-                if len(principal[principal_type]) == 1:
-                    principal[principal_type] = principal[principal_type][0]
-                else:
-                    principal[principal_type] = sorted(principal[principal_type])
+        for princ in (result.get("Principal"), result.get("NotPrincipal")):
+            if princ:
+                for principal_type in ("AWS", "Federated", "Service"):
+                    if principal_type in princ:
+                        if len(listify(princ, principal_type)) == 1:
+                            princ[principal_type] = princ[principal_type][0]
+                        else:
+                            princ[principal_type] = sorted(princ[principal_type])
 
         if "Action" not in result:
             result["Action"] = "sts:AssumeRole"
@@ -218,7 +218,7 @@ class Role(object):
         if not trust and not distrust:
             return
 
-        return self.make_document(trust + distrust)
+        return self.make_document((trust or []) + (distrust or []))
 
     def make_permission_document(self, permissions):
         """Return a document for these permissions, or None if no permissiosn"""

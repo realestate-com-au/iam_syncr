@@ -5,10 +5,11 @@ from iam_syncr.roles import RoleRemoval, Role
 from iam_syncr.amazon import Amazon
 
 from noseOfYeti.tokeniser.support import noy_sup_setUp
-from unittest import TestCase
 from textwrap import dedent
 import uuid
 import mock
+
+from tests.helpers import TestCase
 
 describe TestCase, "RoleRemoval":
     before_each:
@@ -53,12 +54,6 @@ describe TestCase, "Role":
         self.assertEqual(role.permission, [])
 
     describe "Setup":
-        def assertSortedEqual(self, dct1, dct2):
-            """Assert that the {<key>:[<val>, <val>]} are equal regardless of ordering of the <val>"""
-            dct1_ordered = dict((key, sorted(val)) for key, val in dct1.items())
-            dct2_ordered = dict((key, sorted(val)) for key, val in dct2.items())
-            self.assertEqual(dct1_ordered, dct2_ordered)
-
         it "sets description":
             role = Role(self.name, {}, self.amazon)
             role.setup()
@@ -77,40 +72,40 @@ describe TestCase, "Role":
             princ5, tprinc5 = mock.Mock(name="princ5"), mock.Mock(name="tprinc5")
             princ6, tprinc6 = mock.Mock(name="princ6"), mock.Mock(name="tprinc6")
             transformed = {
-                  princ1:{"AWS": [tprinc1, tprinc2]}, princ2:{"AWS": tprinc2}, princ3:{"Service": tprinc3}
-                , princ4:{"AWS": tprinc4}, princ5:{"Federated": tprinc5}, princ6:{"AWS": tprinc6}
+                  princ1:[tprinc1], princ2:[tprinc2], princ3:[tprinc3]
+                , princ4:[tprinc4], princ5:[tprinc5], princ6:[tprinc6]
                 }
 
             allow_to_assume_me = [princ1, princ2, princ3]
             disallow_to_assume_me = [princ4, princ5, princ6]
-            fake_make_trust_principal = mock.Mock(name="make_trust_principal")
-            fake_make_trust_principal.side_effect = lambda princ: transformed[princ]
+            fake_expand_trust_statement = mock.Mock(name="expand_trust_statement")
+            fake_expand_trust_statement.side_effect = lambda princ, allow=False: transformed[princ]
 
             # With lists of principals
             role = Role(self.name, {"allow_to_assume_me": allow_to_assume_me, "disallow_to_assume_me": disallow_to_assume_me}, self.amazon)
             self.assertEqual(role.trust, [])
             self.assertEqual(role.distrust, [])
-            with mock.patch.object(role, "make_trust_principal", fake_make_trust_principal):
+            with mock.patch.object(role, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, {"AWS": [tprinc1, tprinc2], "Service": [tprinc3]})
-            self.assertSortedEqual(role.distrust, {"AWS": [tprinc4, tprinc6], "Federated": [tprinc5]})
+            self.assertSortedEqual(role.trust, [tprinc1, tprinc2, tprinc3])
+            self.assertSortedEqual(role.distrust, [tprinc4, tprinc6, tprinc5])
 
             # And not giving lists
             role = Role(self.name, {"allow_to_assume_me": princ1, "disallow_to_assume_me": princ2}, self.amazon)
             self.assertEqual(role.trust, [])
             self.assertEqual(role.distrust, [])
-            with mock.patch.object(role, "make_trust_principal", fake_make_trust_principal):
+            with mock.patch.object(role, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, {"AWS": [tprinc1, tprinc2]})
-            self.assertSortedEqual(role.distrust, {"AWS": [tprinc2]})
+            self.assertSortedEqual(role.trust, [tprinc1])
+            self.assertSortedEqual(role.distrust, [tprinc2])
 
             # And with only allow
             role = Role(self.name, {"allow_to_assume_me": princ1}, self.amazon)
-            self.assertEqual(role.trust, {})
-            self.assertEqual(role.distrust, {})
-            with mock.patch.object(role, "make_trust_principal", fake_make_trust_principal):
+            self.assertEqual(role.trust, [])
+            self.assertEqual(role.distrust, [])
+            with mock.patch.object(role, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, {"AWS": [tprinc1, tprinc2]})
+            self.assertSortedEqual(role.trust, [tprinc1])
             self.assertSortedEqual(role.distrust, {})
 
         it "adds permissions from permission, allow_permission and deny_permission":
@@ -213,75 +208,59 @@ describe TestCase, "Role":
                 self.amazon.make_instance_profile.assert_called_once_with(self.name)
                 self.assertEqual(called, [1, 2])
 
-    describe "Making a trust principal":
-        def principal_from(self, principal, name=None, **amazon_attrs):
+    describe "Expanding trust statements":
+        def statements_from(self, statement, allow=False):
             """Make a Role and use it to normalise a principal"""
-            if name is None:
-                name = self.name
-
             amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True)
-            for key, val in amazon_attrs.items():
-                setattr(amazon, key, val)
+            return list(Role(self.name, self.definition, amazon).expand_trust_statement(statement, allow=allow))
 
-            return Role(name, self.definition, amazon).make_trust_principal(principal)
+        def assertPrincipal(self, statement, expected):
+            """Make a trust statement and check the Principal"""
+            self.assertEqual(self.statements_from(statement, allow=True), [{"Action": "sts:AssumeRole", "Effect": "Allow", "Sid": "", "Principal": expected}])
 
-        it "gives out capitalised things already in the principal":
-            one = mock.Mock(name="one")
-            two = mock.Mock(name="two")
-            four = mock.Mock(name="four")
-            five = mock.Mock(name="five")
-            three = mock.Mock(name="three")
+        it "sets Principal if allow is True":
+            self.assertEqual(self.statements_from({"service": "ec2"}, allow=True), [{"Action": "sts:AssumeRole", "Effect": "Allow", "Sid": "", "Principal": {"Service": "ec2.amazonaws.com"}}])
 
-            principal = {"one": one, "Two": two, "Three": [three, five], "four": four}
-            self.assertEqual(self.principal_from(principal), {"Two": two, "Three": [three, five]})
+        it "sets NotPrincipal if allow is False":
+            self.assertEqual(self.statements_from({"service": "ec2"}, allow=False), [{"Action": "sts:AssumeRole", "Effect": "Allow", "Sid": "", "NotPrincipal": {"Service": "ec2.amazonaws.com"}}])
 
-        it "converts service into Service and ec2 as a service into ec2.amazonaws.com":
-            principal = {"service": "ec2"}
-            self.assertEqual(self.principal_from(principal), {"Service": ["ec2.amazonaws.com"]})
+        it "sets Federated to iam roles and Action to sts:AssumeRoleWithSAML if using federated iam roles":
+            iam_specs = mock.Mock(name="iam_specs")
+            transformed_specs = mock.Mock(name="transformed_specs")
+            iam_arns_from_specification = mock.Mock(name="iam_arns_from_specification")
+            iam_arns_from_specification.return_value = [transformed_specs]
 
-            principal = {"service": ["ec2", "other"]}
-            self.assertEqual(self.principal_from(principal), {"Service": ["ec2.amazonaws.com", "other"]})
+            with mock.patch("iam_syncr.roles.Role.iam_arns_from_specification", iam_arns_from_specification):
+                self.assertEqual(self.statements_from({"federated": iam_specs}, allow=True), [{"Action": "sts:AssumeRoleWithSAML", "Effect": "Allow", "Sid": "", "Principal": {"Federated": transformed_specs}}])
 
-            principal = {"service": ["e2", "other"], "Service": ["stuff", "tree"]}
-            self.assertEqual(self.principal_from(principal), {"Service": ["stuff", "tree", "e2", "other"]})
+            iam_arns_from_specification.assert_called_once_with(iam_specs)
 
-            principal = {"service": "e2", "Service": "stuff"}
-            self.assertEqual(self.principal_from(principal), {"Service": ["stuff", "e2"]})
+        it "sets AWS to expanded iam_roles":
+            iam_specs = mock.Mock(name="iam_specs")
+            transformed_specs = mock.Mock(name="transformed_specs")
+            iam_arns_from_specification = mock.Mock(name="iam_arns_from_specification")
+            iam_arns_from_specification.return_value = [transformed_specs]
 
-        it "Uses iam_arns_from_specification to translate iam specifications":
-            iam_arns = [mock.Mock(name="iam_arn")]
+            with mock.patch("iam_syncr.roles.Role.iam_arns_from_specification", iam_arns_from_specification):
+                self.assertEqual(self.statements_from({"iam": iam_specs}, allow=True), [{"Action": "sts:AssumeRole", "Effect": "Allow", "Sid": "", "Principal": {"AWS": transformed_specs}}])
 
-            principal = mock.MagicMock(name="principal")
-            principal.items.return_value = []
-            principal.__contains__.side_effect = lambda key: key == "iam"
+            iam_arns_from_specification.assert_called_once_with({"iam": iam_specs})
 
-            fake_iam_arns_from_specification = mock.Mock(name="iam_arns_from_specification")
-            fake_iam_arns_from_specification.return_value = iam_arns
+        it "sets Service from service":
+            self.assertPrincipal({"service": ["ec2", "blah"]}, {"Service": sorted(["ec2.amazonaws.com", "blah"])})
 
-            role = Role(self.name, self.definition, self.amazon)
-            with mock.patch.object(role, "iam_arns_from_specification", fake_iam_arns_from_specification):
-                result = role.make_trust_principal(principal)
+        it "unlists AWS, Federated and Service":
+            self.assertEqual(
+                  self.statements_from({"NotPrincipal": {"Service": ['hello']}, "Principal": {"Service": ['what'], "Federated": ["is"], "AWS": ["up"]}}, allow=True)
+                , [{"Action": "sts:AssumeRole", "Effect": "Allow", "Sid": "", "NotPrincipal": {"Service": "hello"}, "Principal": {"Service": "what", "Federated": "is", "AWS": "up"}}]
+                )
 
-            self.assertEqual(result, {"AWS": iam_arns})
-            fake_iam_arns_from_specification.assert_called_once_with(principal)
+        it "doesn't override Action, Effect or Sid":
+            sid = mock.Mock(name="sid")
+            action = mock.Mock(name="action")
+            effect = mock.Mock(name="effect")
 
-        it "can combine iam":
-            principal = {"iam": "__self__", "AWS": "blah"}
-            result = self.principal_from(principal, name="yo", account_id=9001)
-            self.assertEqual(result, {"AWS": ["blah", "arn:aws:iam::9001:role/yo"]})
-
-        it "converts federated into Federated":
-            principal = {"federated": "e2"}
-            self.assertEqual(self.principal_from(principal), {"Federated": ["e2"]})
-
-            principal = {"federated": ["e2", "other"]}
-            self.assertEqual(self.principal_from(principal), {"Federated": ["e2", "other"]})
-
-            principal = {"federated": ["e2", "other"], "Federated": ["stuff", "tree"]}
-            self.assertEqual(self.principal_from(principal), {"Federated": ["stuff", "tree", "e2", "other"]})
-
-            principal = {"federated": "e2", "Federated": "stuff"}
-            self.assertEqual(self.principal_from(principal), {"Federated": ["stuff", "e2"]})
+            self.assertEqual(list(self.statements_from({"Effect": effect, "Action": action, "Sid": sid}, allow=True)), [{"Action": action, "Effect": effect, "Sid": sid, "Principal":{}}])
 
     describe "Making permissions statements":
         def statements_from(self, policy, allow=None, patches=None):
@@ -524,7 +503,7 @@ describe TestCase, "Role":
             self.assertIs(self.role.make_trust_document(None, []), None)
             self.assertIs(self.role.make_trust_document(None, None), None)
 
-        it "Sets Action to sts:AssumeRole, Effect to Allow, Principal to trust and NotPrincipal to distrust":
+        it "Makes a document with the combined trust and distrust":
             result = mock.Mock(name="result")
             fake_make_document = mock.Mock(name="make_document")
             fake_make_document.return_value = result
@@ -533,16 +512,16 @@ describe TestCase, "Role":
             distrust = mock.Mock(name="distrust")
 
             with mock.patch.object(self.role, "make_document", fake_make_document):
-                self.assertIs(self.role.make_trust_document(trust, distrust), result)
-                fake_make_document.assert_called_once_with([{"Sid": "", "Action": "sts:AssumeRole", "Effect": "Allow", "Principal": trust, "NotPrincipal": distrust}])
+                self.assertIs(self.role.make_trust_document([trust], [distrust]), result)
+                fake_make_document.assert_called_once_with([trust, distrust])
 
                 fake_make_document.reset_mock()
-                self.assertIs(self.role.make_trust_document(trust, None), result)
-                fake_make_document.assert_called_once_with([{"Sid": "", "Action": "sts:AssumeRole", "Effect": "Allow", "Principal": trust}])
+                self.assertIs(self.role.make_trust_document([trust], None), result)
+                fake_make_document.assert_called_once_with([trust])
 
                 fake_make_document.reset_mock()
-                self.assertIs(self.role.make_trust_document(None, distrust), result)
-                fake_make_document.assert_called_once_with([{"Sid": "", "Action": "sts:AssumeRole", "Effect": "Allow", "NotPrincipal": distrust}])
+                self.assertIs(self.role.make_trust_document(None, [distrust]), result)
+                fake_make_document.assert_called_once_with([distrust])
 
     describe "Making a permission document":
         before_each:
