@@ -84,7 +84,7 @@ class Statements(object):
             for specified in listified(policy, key):
                 listify(result, dest).append(specified)
 
-        for key, dest in (("resource", "Resource"), ("notresource", "NotResource")):
+        for key, dest in (("resource", "Resource"), ("notresource", "NotResource"), ("principal", "Principal"), ("notprincipal", "NotPrincipal")):
             for specified in listified(policy, key):
                 listify(result, dest).extend(self.fill_out_resources(specified))
 
