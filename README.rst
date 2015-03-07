@@ -162,5 +162,4 @@ The Future
 In order of importance:
 
 * More Tests
-* Support editing users and groups
 
