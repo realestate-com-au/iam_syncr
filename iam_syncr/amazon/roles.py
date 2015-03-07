@@ -176,6 +176,14 @@ class AmazonRoles(object, AmazonMixin):
         """Remove the role if it exists"""
         role_name, _ = self.split_role_name(name)
         if self.has_role(role_name):
+            with self.catch_boto_400("Couldn't get policies for a role", role=role_name):
+                current_policies = self.current_role_policies(role_name, comparing=[])
+
+            for policy in current_policies:
+                with self.catch_boto_400("Couldn't delete a policy from a role", policy=policy, role=role_name):
+                    for _ in self.change("-", "policy", role=role_name, policy=policy):
+                        self.connection.delete_role_policy(role_name, policy)
+
             with self.catch_boto_400("Couldn't delete a role", role=role_name):
                 for _ in self.change("-", "role", role=role_name):
                     self.connection.delete_role(role_name)
