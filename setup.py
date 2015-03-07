@@ -14,6 +14,7 @@ setup(
       , "option_merge==0.7"
       , "datadiff"
       , "delfick_error"
+      , "six"
       ]
 
     , extras_require =

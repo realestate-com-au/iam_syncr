@@ -508,6 +508,12 @@ describe TestCase, "Role":
             assert_good = lambda policy, expected: self.assertEqual(list(self.role.iam_arns_from_specification(policy)), expected)
             assert_good({"iam":"steve"}, ["arn:aws:iam::9003:steve"])
 
+        it "yields the arns if supplied as strings":
+            self.role.amazon.account_id = 9004
+            assert_good = lambda policy, expected: self.assertEqual(list(self.role.iam_arns_from_specification(policy)), expected)
+            assert_good(["arn:aws:iam::9004:yeap", "arn:aws:iam::9005:tree"], ["arn:aws:iam::9004:yeap", "arn:aws:iam::9005:tree"])
+            assert_good("arn:aws:iam::9004:yeap", ["arn:aws:iam::9004:yeap"])
+
     describe "Making a trust document":
         before_each:
             self.role = Role(self.name, self.definition, self.amazon)

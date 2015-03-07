@@ -183,28 +183,35 @@ class Role(object):
 
     def iam_arns_from_specification(self, specification):
         """Get us an iam arn from this specification"""
-        provided_account = specification.get("account", "")
-        if provided_account:
-            if provided_account not in self.amazon.accounts:
-                raise BadPolicy("Unknown account specified", account=provided_account, specification=specification)
-            else:
-                account_id = self.amazon.accounts[provided_account]
-        else:
-            account_id = self.amazon.account_id
+        if not isinstance(specification, list):
+            specification = [specification]
 
-        users = specification.get("users", [])
-        for name in listified(specification, "iam"):
-            if name == "__self__":
-                account_id = self.amazon.account_id
-                name = "role/{0}".format(self.name)
-
-            service = "sts" if name.startswith("assumed-role") else "iam"
-            spec = "arn:aws:{0}::{1}:{2}".format(service, account_id, name)
-            if not users:
+        for spec in specification:
+            if isinstance(spec, six.string_types):
                 yield spec
             else:
-                for user in users:
-                    yield "{0}/{1}".format(spec, user)
+                provided_account = spec.get("account", "")
+                if provided_account:
+                    if provided_account not in self.amazon.accounts:
+                        raise BadPolicy("Unknown account specified", account=provided_account, specification=spec)
+                    else:
+                        account_id = self.amazon.accounts[provided_account]
+                else:
+                    account_id = self.amazon.account_id
+
+                users = spec.get("users", [])
+                for name in listified(spec, "iam"):
+                    if name == "__self__":
+                        account_id = self.amazon.account_id
+                        name = "role/{0}".format(self.name)
+
+                    service = "sts" if name.startswith("assumed-role") else "iam"
+                    spec = "arn:aws:{0}::{1}:{2}".format(service, account_id, name)
+                    if not users:
+                        yield spec
+                    else:
+                        for user in users:
+                            yield "{0}/{1}".format(spec, user)
 
     def make_trust_document(self, trust, distrust):
         """Make a document for trust or None if no trust or distrust"""
