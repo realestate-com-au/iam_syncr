@@ -1,5 +1,6 @@
 from iam_syncr.errors import InvalidDocument, BadRole, BadPolicy, CantFindTemplate, NoTemplates
 from iam_syncr.helpers import listify, listified, as_list
+from iam_syncr.amazon.roles import AmazonRoles
 
 from option_merge import MergedOptions
 import logging
@@ -21,15 +22,17 @@ class RoleRemoval(object):
 
     def resolve(self):
         """Remove the role"""
-        self.amazon.remove_role(self.name)
+        AmazonRoles(self.amazon).remove_role(self.name)
 
 class Role(object):
     def __init__(self, name, definition, amazon, templates=None):
         self.name = name
-        self.amazon = amazon
         self.templates = templates
         self.definition = definition
         self.policy_name = "syncr_policy_{0}".format(self.name.replace("/", "__"))
+
+        self.amazon = amazon
+        self.amazon_roles = AmazonRoles(amazon)
 
         self.trust = []
         self.distrust = []
@@ -67,14 +70,14 @@ class Role(object):
         trust_document = self.make_trust_document(self.trust, self.distrust)
         permission_document = self.make_permission_document(self.permission)
 
-        role_info = self.amazon.role_info(self.name)
+        role_info = self.amazon_roles.role_info(self.name)
         if not role_info:
-            self.amazon.create_role(self.name, trust_document, policies={self.policy_name: permission_document})
+            self.amazon_roles.create_role(self.name, trust_document, policies={self.policy_name: permission_document})
         else:
-            self.amazon.modify_role(role_info, self.name, trust_document, policies={self.policy_name: permission_document})
+            self.amazon_roles.modify_role(role_info, self.name, trust_document, policies={self.policy_name: permission_document})
 
         if self.definition.get("make_instance_profile"):
-            self.amazon.make_instance_profile(self.name)
+            self.amazon_roles.make_instance_profile(self.name)
 
     def expand_trust_statement(self, statement, allow=False):
         """Make a trust statement"""

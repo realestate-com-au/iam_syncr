@@ -1,6 +1,7 @@
 # coding: spec
 
 from iam_syncr.errors import BadRole, BadPolicy, InvalidDocument
+from iam_syncr.amazon.roles import AmazonRoles
 from iam_syncr.roles import RoleRemoval, Role
 from iam_syncr.amazon.base import Amazon
 
@@ -14,7 +15,7 @@ from tests.helpers import TestCase
 describe TestCase, "RoleRemoval":
     before_each:
         self.name = mock.Mock(name="name")
-        self.amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True)
+        self.amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True, dry_run=False)
 
     it "has a name and amazon object":
         name = mock.Mock(name="name")
@@ -31,13 +32,15 @@ describe TestCase, "RoleRemoval":
 
     describe "Resolving":
         it "asks amazon to remove the role":
-            RoleRemoval(self.name, self.amazon).resolve()
-            self.amazon.remove_role.assert_called_once_with(self.name)
+            remove_role = mock.Mock(name="remove_role")
+            with mock.patch.object(AmazonRoles, "remove_role", remove_role):
+                RoleRemoval(self.name, self.amazon).resolve()
+            remove_role.assert_called_once_with(self.name)
 
 describe TestCase, "Role":
     before_each:
         self.name = mock.Mock(name="name")
-        self.amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True)
+        self.amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True, dry_run=False)
         self.definition = mock.Mock(name="definition")
 
     it "has a name, definition and amazon object; and inits trust, distrust and permission":
@@ -169,49 +172,58 @@ describe TestCase, "Role":
 
         describe "When the role doesn't already exist":
             it "creates the role and makes an instance profile if it needs to":
-                self.amazon.role_info.return_value = False
+                role_info = mock.Mock(name="remove_role")
+                create_role = mock.Mock(name="create_role")
+                make_instance_profile = mock.Mock(name="make_instance_profile")
 
-                fake_make_trust_document = mock.Mock(name="make_trust_document")
-                fake_make_trust_document.return_value = self.trust_document
+                with mock.patch.multiple(AmazonRoles, role_info=role_info, create_role=create_role, make_instance_profile=make_instance_profile):
+                    role_info.return_value = False
 
-                fake_make_permission_document = mock.Mock(name="make_permission_document")
-                fake_make_permission_document.return_value = self.permission_document
+                    fake_make_trust_document = mock.Mock(name="make_trust_document")
+                    fake_make_trust_document.return_value = self.trust_document
 
-                called = []
-                self.amazon.create_role.side_effect = lambda *args, **kwargs: called.append(1)
-                self.amazon.make_instance_profile.side_effect = lambda *args, **kwargs: called.append(2)
+                    fake_make_permission_document = mock.Mock(name="make_permission_document")
+                    fake_make_permission_document.return_value = self.permission_document
 
-                with mock.patch.multiple(self.role, make_trust_document=fake_make_trust_document, make_permission_document=fake_make_permission_document):
-                    self.role.resolve()
-                self.amazon.create_role.assert_called_once_with(self.name, self.trust_document, policies={self.policy_name: self.permission_document})
-                self.amazon.make_instance_profile.assert_called_once_with(self.name)
-                self.assertEqual(called, [1, 2])
+                    called = []
+                    create_role.side_effect = lambda *args, **kwargs: called.append(1)
+                    make_instance_profile.side_effect = lambda *args, **kwargs: called.append(2)
+
+                    with mock.patch.multiple(self.role, make_trust_document=fake_make_trust_document, make_permission_document=fake_make_permission_document):
+                        self.role.resolve()
+                    create_role.assert_called_once_with(self.name, self.trust_document, policies={self.policy_name: self.permission_document})
+                    make_instance_profile.assert_called_once_with(self.name)
+                    self.assertEqual(called, [1, 2])
 
         describe "When the role does already exist":
             it "modifies the role and makes an instance profile if it needs to":
-                role_info = mock.Mock(name="role_info")
-                self.amazon.role_info.return_value = role_info
+                role_info = mock.Mock(name="remove_role")
+                modify_role = mock.Mock(name="modify_role")
+                make_instance_profile = mock.Mock(name="make_instance_profile")
 
-                fake_make_trust_document = mock.Mock(name="make_trust_document")
-                fake_make_trust_document.return_value = self.trust_document
+                with mock.patch.multiple(AmazonRoles, role_info=role_info, modify_role=modify_role, make_instance_profile=make_instance_profile):
+                    role_info.return_value = role_info
 
-                fake_make_permission_document = mock.Mock(name="make_permission_document")
-                fake_make_permission_document.return_value = self.permission_document
+                    fake_make_trust_document = mock.Mock(name="make_trust_document")
+                    fake_make_trust_document.return_value = self.trust_document
 
-                called = []
-                self.amazon.modify_role.side_effect = lambda *args, **kwargs: called.append(1)
-                self.amazon.make_instance_profile.side_effect = lambda *args, **kwargs: called.append(2)
+                    fake_make_permission_document = mock.Mock(name="make_permission_document")
+                    fake_make_permission_document.return_value = self.permission_document
 
-                with mock.patch.multiple(self.role, make_trust_document=fake_make_trust_document, make_permission_document=fake_make_permission_document):
-                    self.role.resolve()
-                self.amazon.modify_role.assert_called_once_with(role_info, self.name, self.trust_document, policies={self.policy_name: self.permission_document})
-                self.amazon.make_instance_profile.assert_called_once_with(self.name)
-                self.assertEqual(called, [1, 2])
+                    called = []
+                    modify_role.side_effect = lambda *args, **kwargs: called.append(1)
+                    make_instance_profile.side_effect = lambda *args, **kwargs: called.append(2)
+
+                    with mock.patch.multiple(self.role, make_trust_document=fake_make_trust_document, make_permission_document=fake_make_permission_document):
+                        self.role.resolve()
+                    modify_role.assert_called_once_with(role_info, self.name, self.trust_document, policies={self.policy_name: self.permission_document})
+                    make_instance_profile.assert_called_once_with(self.name)
+                    self.assertEqual(called, [1, 2])
 
     describe "Expanding trust statements":
         def statements_from(self, statement, allow=False):
             """Make a Role and use it to normalise a principal"""
-            amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True)
+            amazon = mock.create_autospec(spec=Amazon, instance=True, spec_set=True, dry_run=False)
             return list(Role(self.name, self.definition, amazon).expand_trust_statement(statement, allow=allow))
 
         def assertPrincipal(self, statement, expected):
