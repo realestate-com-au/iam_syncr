@@ -1,4 +1,7 @@
-from delfick_error import DelfickError
+from delfick_error import DelfickError, ProgrammerError
+
+# I use Programmererror, make vim be quiet about it
+ProgrammerError = ProgrammerError
 
 class SyncrError(DelfickError): pass
 
