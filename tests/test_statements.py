@@ -130,16 +130,16 @@ describe TestCase, "Statements":
         it "sets Action and NotAction from action and notaction":
             for key, dest in (("action", "Action"), ("notaction", "NotAction")):
                 policy = {"Resource": "resource", key: "Stuff"}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff"]}])
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: "Stuff"}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: "Stuff"}])
 
                 policy = {"Resource": "resource", key: ["Stuff"]}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff"]}])
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: "Stuff"}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: "Stuff"}])
 
                 policy = {"Resource": "resource", key: ["Stuff", "otHer:*"]}
-                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: ["Stuff", "otHer:*"]}])
-                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: ["Stuff", "otHer:*"]}])
+                self.assertEqual(self.statements_from(policy, allow=True), [{"Effect": "Allow", "Resource": "resource", dest: sorted(["Stuff", "otHer:*"])}])
+                self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: sorted(["Stuff", "otHer:*"])}])
 
         it "sets Resource and NotResource from resource and notresource":
             res1, tres1 = mock.Mock(name="res1"), mock.Mock(name="tres1")
@@ -152,16 +152,16 @@ describe TestCase, "Statements":
 
             for key, dest in (("resource", "Resource"), ("notresource", "NotResource")):
                 policy = {"Action": "action", key: res1}
-                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: [tres1]}])
-                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: [tres1]}])
+                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: tres1}])
+                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: tres1}])
 
                 policy = {"Action": "action", key: [res1]}
-                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: [tres1]}])
-                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: [tres1]}])
+                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: tres1}])
+                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: tres1}])
 
                 policy = {"Action": "action", key: [res2, res3]}
-                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: [tres2, tres3, tres4]}])
-                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: [tres2, tres3, tres4]}])
+                self.assertEqual(self.statements_from(policy, allow=True, patches=patches), [{"Effect": "Allow", "Action": "action", dest: sorted([tres2, tres3, tres4])}])
+                self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: sorted([tres2, tres3, tres4])}])
 
         it "complains if no resource gets set":
             with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
@@ -185,12 +185,12 @@ describe TestCase, "Statements":
 
             assert_works = lambda key, val, expected_key, expected_val: self.assertEqual(
                   self.statements_from({"resource": "some_arn", key:val}, allow=True)
-                , [{"Resource":["some_arn"], expected_key: expected_val, "Effect": "Allow"}]
+                , [{"Resource":"some_arn", expected_key: expected_val, "Effect": "Allow"}]
                 )
 
-            assert_works("action", "iam:*", "Action", ["iam:*"])
+            assert_works("action", "iam:*", "Action", "iam:*")
             assert_works("Action", "iam:*", "Action", "iam:*")
-            assert_works("notaction", "iam:*", "NotAction", ["iam:*"])
+            assert_works("notaction", "iam:*", "NotAction", "iam:*")
             assert_works("NotAction", "iam:*", "NotAction", "iam:*")
 
     describe "Filling out resource definition":

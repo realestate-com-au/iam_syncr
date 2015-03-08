@@ -100,6 +100,18 @@ class Statements(object):
         if "Action" not in result and "NotAction" not in result:
             raise BadPolicy("No Action or NotAction defined for this policy", policy=policy, **{self.self_type:self.name})
 
+        if "Sid" not in result and self.self_type == "bucket":
+            result["Sid"] = ""
+
+        # Amazon gets rid of the lists if only one item
+        # And this mucks around with the diffing....
+        for thing in ("Action", "NotAction", "Resource", "NotResource"):
+            if thing in result:
+                if len(listify(result, thing)) == 1:
+                    result[thing] = result[thing][0]
+                else:
+                    result[thing] = sorted(result[thing])
+
         yield result
 
     def fill_out_resources(self, resources):
