@@ -142,31 +142,35 @@ class Statements(object):
             if isinstance(spec, six.string_types):
                 yield spec
             else:
-                provided_account = spec.get("account", "")
-                if provided_account:
-                    if provided_account not in self.accounts:
-                        raise BadPolicy("Unknown account specified", account=provided_account, specification=spec)
+                provided_accounts = spec.get("account", "")
+                if not isinstance(provided_accounts, list):
+                    provided_accounts = [provided_accounts]
+
+                for provided_account in provided_accounts:
+                    if provided_account:
+                        if provided_account not in self.accounts:
+                            raise BadPolicy("Unknown account specified", account=provided_account, specification=spec)
+                        else:
+                            account_id = self.accounts[provided_account]
                     else:
-                        account_id = self.accounts[provided_account]
-                else:
-                    account_id = self.account_id
-
-                users = spec.get("users", [])
-                for name in listified(spec, "iam"):
-                    if name == "__self__":
-                        if self.self_type == 'bucket':
-                            raise BadPolicy("Bucket policy has no __self__ iam role", bucket=self.name)
-
                         account_id = self.account_id
-                        name = "role/{0}".format(self.name)
 
-                    service = "sts" if name.startswith("assumed-role") else "iam"
-                    spec = "arn:aws:{0}::{1}:{2}".format(service, account_id, name)
-                    if not users:
-                        yield spec
-                    else:
-                        for user in users:
-                            yield "{0}/{1}".format(spec, user)
+                    users = spec.get("users", [])
+                    for name in listified(spec, "iam"):
+                        if name == "__self__":
+                            if self.self_type == 'bucket':
+                                raise BadPolicy("Bucket policy has no __self__ iam role", bucket=self.name)
+
+                            account_id = self.account_id
+                            name = "role/{0}".format(self.name)
+
+                        service = "sts" if name.startswith("assumed-role") else "iam"
+                        arn = "arn:aws:{0}::{1}:{2}".format(service, account_id, name)
+                        if not users:
+                            yield arn
+                        else:
+                            for user in users:
+                                yield "{0}/{1}".format(arn, user)
 
     def make_document(self, statements):
         """Make sure our document is valid and return it formatted correctly"""

@@ -289,6 +289,15 @@ describe TestCase, "Statements":
             assert_good(["arn:aws:iam::9004:yeap", "arn:aws:iam::9005:tree"], ["arn:aws:iam::9004:yeap", "arn:aws:iam::9005:tree"])
             assert_good("arn:aws:iam::9004:yeap", ["arn:aws:iam::9004:yeap"])
 
+        it "yields from multiple accounts and users":
+            self.accounts["dev"] = 9003
+            self.accounts["prod"] = 9004
+            assert_good = lambda policy, expected: self.assertEqual(list(self.statements.iam_arns_from_specification(policy)), expected)
+            assert_good(
+                  {"iam":"role", "account":["dev", "prod"], "users":["bob", "jane"]}
+                , ["arn:aws:iam::9003:role/bob", "arn:aws:iam::9003:role/jane", "arn:aws:iam::9004:role/bob", "arn:aws:iam::9004:role/jane"]
+                )
+
     describe "making a document":
         it "complains if given something that isn't a list":
             for statements in (0, 1, None, True, False, {}, {1:2}, lambda: 1, mock.Mock(name="blah"), "blah"):
