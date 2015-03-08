@@ -20,38 +20,8 @@ class Statements(object):
     def expand_trust_statement(self, statement, allow=False):
         """Make a trust statement"""
         result = dict((key, val) for key, val in statement.items() if key[0].isupper())
-
-        if allow and "Principal" not in result:
-            result["Principal"] = {}
-            principal = result["Principal"]
-
-        if not allow and "NotPrincipal" not in result:
-            result["NotPrincipal"] = {}
-            principal = result["NotPrincipal"]
-
-        for specified in listified(statement, "service"):
-            if specified == "ec2":
-                specified = "ec2.amazonaws.com"
-            listify(principal, "Service").append(specified)
-
-        for specified in listified(statement, "federated"):
-            listify(principal, "Federated").extend(self.iam_arns_from_specification(specified))
-            if "Action" not in result:
-                result["Action"] = "sts:AssumeRoleWithSAML"
-
-        if "iam" in statement:
-            listify(principal, "AWS").extend(self.iam_arns_from_specification(statement))
-
-        # Amazon gets rid of the lists if only one item
-        # And this mucks around with the diffing....
-        for princ in (result.get("Principal"), result.get("NotPrincipal")):
-            if princ:
-                for principal_type in ("AWS", "Federated", "Service"):
-                    if principal_type in princ:
-                        if len(listify(princ, principal_type)) == 1:
-                            princ[principal_type] = princ[principal_type][0]
-                        else:
-                            princ[principal_type] = sorted(princ[principal_type])
+        principal = "principal" if allow else "notprincipal"
+        self.expand_principal({principal: statement}, result)
 
         if "Action" not in result:
             result["Action"] = "sts:AssumeRole"
@@ -63,6 +33,40 @@ class Statements(object):
             result["Sid"] = ""
 
         yield result
+
+    def expand_principal(self, statement, result):
+        """Expand out Principal and NotPrincipal"""
+        for principal, capd in [("principal", "Principal"), ("notprincipal", "NotPrincipal")]:
+            if principal in statement:
+                if capd not in result:
+                    result[capd] = {}
+
+                looking_at = statement[principal]
+                principal = result[capd]
+
+                for specified in listified(looking_at, "service"):
+                    if specified == "ec2":
+                        specified = "ec2.amazonaws.com"
+                    listify(principal, "Service").append(specified)
+
+                for specified in listified(looking_at, "federated"):
+                    listify(principal, "Federated").extend(self.iam_arns_from_specification(specified))
+                    if "Action" not in result:
+                        result["Action"] = "sts:AssumeRoleWithSAML"
+
+                if "iam" in looking_at:
+                    listify(principal, "AWS").extend(self.iam_arns_from_specification(looking_at))
+
+        # Amazon gets rid of the lists if only one item
+        # And this mucks around with the diffing....
+        for princ in (result.get("Principal"), result.get("NotPrincipal")):
+            if princ:
+                for principal_type in ("AWS", "Federated", "Service"):
+                    if principal_type in princ:
+                        if len(listify(princ, principal_type)) == 1:
+                            princ[principal_type] = princ[principal_type][0]
+                        else:
+                            princ[principal_type] = sorted(princ[principal_type])
 
     def make_permission_statements(self, policy, allow=None):
         """
@@ -84,9 +88,11 @@ class Statements(object):
             for specified in listified(policy, key):
                 listify(result, dest).append(specified)
 
-        for key, dest in (("resource", "Resource"), ("notresource", "NotResource"), ("principal", "Principal"), ("notprincipal", "NotPrincipal")):
+        for key, dest in (("resource", "Resource"), ("notresource", "NotResource")):
             for specified in listified(policy, key):
                 listify(result, dest).extend(self.fill_out_resources(specified))
+
+        self.expand_principal(policy, result)
 
         if "Resource" not in result and "NotResource" not in result:
             raise BadPolicy("No Resource or NotResource was defined for policy", policy=policy, **{self.self_type:self.name})
