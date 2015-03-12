@@ -37,11 +37,15 @@ class AmazonDocuments(object):
             if "Statement" in document:
                 if type(document["Statement"]) is dict:
                     sort_statement(document["Statement"])
+                    sort_key(document["Statement"], "Action")
+                    sort_key(document["Statement"], "NotAction")
                     sort_key(document["Statement"], "Resource")
                     sort_key(document["Statement"], "NotResource")
                 else:
                     for statement in document["Statement"]:
                         sort_statement(statement)
+                        sort_key(statement, "Action")
+                        sort_key(statement, "NotAction")
                         sort_key(statement, "Resource")
                         sort_key(statement, "NotResource")
 
