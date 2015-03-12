@@ -42,20 +42,24 @@ class Statements(object):
                     result[capd] = {}
 
                 looking_at = statement[principal]
-                principal = result[capd]
+                if not isinstance(looking_at, list):
+                    looking_at = [looking_at]
 
-                for specified in listified(looking_at, "service"):
-                    if specified == "ec2":
-                        specified = "ec2.amazonaws.com"
-                    listify(principal, "Service").append(specified)
+                for instruction in looking_at:
+                    principal = result[capd]
 
-                for specified in listified(looking_at, "federated"):
-                    listify(principal, "Federated").extend(self.iam_arns_from_specification(specified))
-                    if "Action" not in result:
-                        result["Action"] = "sts:AssumeRoleWithSAML"
+                    for specified in listified(instruction, "service"):
+                        if specified == "ec2":
+                            specified = "ec2.amazonaws.com"
+                        listify(principal, "Service").append(specified)
 
-                if "iam" in looking_at:
-                    listify(principal, "AWS").extend(self.iam_arns_from_specification(looking_at))
+                    for specified in listified(instruction, "federated"):
+                        listify(principal, "Federated").extend(self.iam_arns_from_specification(specified))
+                        if "Action" not in result:
+                            result["Action"] = "sts:AssumeRoleWithSAML"
+
+                    if "iam" in instruction:
+                        listify(principal, "AWS").extend(self.iam_arns_from_specification(instruction))
 
         # Amazon gets rid of the lists if only one item
         # And this mucks around with the diffing....
