@@ -8,9 +8,14 @@ from iam_syncr.amazon.base import Amazon
 from noseOfYeti.tokeniser.support import noy_sup_setUp
 from textwrap import dedent
 import uuid
-import mock
+import six
 
 from tests.helpers import TestCase
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 describe TestCase, "RoleRemoval":
     before_each:
@@ -27,7 +32,7 @@ describe TestCase, "RoleRemoval":
     describe "Setup":
         it "complains if the name isn't a string":
             for name in (0, 1, True, False, None, [], [1], {}, {1:2}, lambda: 1, mock.Mock(name="mock")):
-                with self.assertRaisesRegexp(BadRole, "Told to remove a role, but not specified as a string.+"):
+                with self.fuzzyAssertRaisesError(BadRole, "Told to remove a role, but not specified as a string"):
                     RoleRemoval(name, self.amazon).setup()
 
     describe "Resolving":
@@ -75,14 +80,14 @@ describe TestCase, "Role":
             princ5, tprinc5 = mock.Mock(name="princ5"), mock.Mock(name="tprinc5")
             princ6, tprinc6 = mock.Mock(name="princ6"), mock.Mock(name="tprinc6")
             transformed = {
-                  princ1:[tprinc1], princ2:[tprinc2], princ3:[tprinc3]
-                , princ4:[tprinc4], princ5:[tprinc5], princ6:[tprinc6]
+                  str(princ1):[str(tprinc1)], str(princ2):[str(tprinc2)], str(princ3):[str(tprinc3)]
+                , str(princ4):[str(tprinc4)], str(princ5):[str(tprinc5)], str(princ6):[str(tprinc6)]
                 }
 
-            allow_to_assume_me = [princ1, princ2, princ3]
-            disallow_to_assume_me = [princ4, princ5, princ6]
+            allow_to_assume_me = [str(princ1), str(princ2), str(princ3)]
+            disallow_to_assume_me = [str(princ4), str(princ5), str(princ6)]
             fake_expand_trust_statement = mock.Mock(name="expand_trust_statement")
-            fake_expand_trust_statement.side_effect = lambda princ, allow=False: transformed[princ]
+            fake_expand_trust_statement.side_effect = lambda princ, allow=False: transformed[str(princ)]
 
             # With lists of principals
             role = Role(self.name, {"allow_to_assume_me": allow_to_assume_me, "disallow_to_assume_me": disallow_to_assume_me}, self.amazon)
@@ -90,8 +95,8 @@ describe TestCase, "Role":
             self.assertEqual(role.distrust, [])
             with mock.patch.object(role.statements, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, [tprinc1, tprinc2, tprinc3])
-            self.assertSortedEqual(role.distrust, [tprinc4, tprinc6, tprinc5])
+            self.assertSortedEqual(role.trust, [str(tprinc1), str(tprinc2), str(tprinc3)])
+            self.assertSortedEqual(role.distrust, [str(tprinc4), str(tprinc6), str(tprinc5)])
 
             # And not giving lists
             role = Role(self.name, {"allow_to_assume_me": princ1, "disallow_to_assume_me": princ2}, self.amazon)
@@ -99,16 +104,16 @@ describe TestCase, "Role":
             self.assertEqual(role.distrust, [])
             with mock.patch.object(role.statements, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, [tprinc1])
-            self.assertSortedEqual(role.distrust, [tprinc2])
+            self.assertSortedEqual(role.trust, [str(tprinc1)])
+            self.assertSortedEqual(role.distrust, [str(tprinc2)])
 
             # And with only allow
-            role = Role(self.name, {"allow_to_assume_me": princ1}, self.amazon)
+            role = Role(self.name, {"allow_to_assume_me": str(princ1)}, self.amazon)
             self.assertEqual(role.trust, [])
             self.assertEqual(role.distrust, [])
             with mock.patch.object(role.statements, "expand_trust_statement", fake_expand_trust_statement):
                 role.setup()
-            self.assertSortedEqual(role.trust, [tprinc1])
+            self.assertSortedEqual(role.trust, [str(tprinc1)])
             self.assertSortedEqual(role.distrust, {})
 
         it "adds permissions from permission, allow_permission and deny_permission":

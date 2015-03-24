@@ -1,4 +1,5 @@
 from unittest import TestCase as UnitTestTestCase
+from delfick_error import DelfickErrorTestMixin
 from contextlib import contextmanager
 import tempfile
 import shutil
@@ -31,7 +32,7 @@ def a_directory(removed=False):
         if location and os.path.exists(location):
             shutil.rmtree(location)
 
-class TestCase(UnitTestTestCase):
+class TestCase(UnitTestTestCase, DelfickErrorTestMixin):
     def assertSortedEqual(self, listone, listtwo):
         self.assertEqual(sorted(listone), sorted(listtwo))
 

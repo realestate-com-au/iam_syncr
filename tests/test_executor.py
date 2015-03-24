@@ -6,31 +6,37 @@ from iam_syncr import executor
 from tests.helpers import a_file, a_directory
 
 from argparse import ArgumentTypeError
-from unittest import TestCase
-import mock
 import yaml
+import six
 import os
+
+from tests.helpers import TestCase
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 describe TestCase, "cli arguments":
     describe "Readable folder":
         it "complains if the path doesn't exist":
             with a_directory(removed=True) as directory:
-                with self.assertRaisesRegexp(ArgumentTypeError, "{0} doesn't exist".format(directory)):
+                with self.fuzzyAssertRaisesError(ArgumentTypeError, "{0} doesn't exist".format(directory)):
                     executor.argparse_readable_folder(directory)
 
         it "complains if it's not a directory":
             with a_file() as filename:
-                with self.assertRaisesRegexp(ArgumentTypeError, "{0} exists but isn't a folder".format(filename)):
+                with self.fuzzyAssertRaisesError(ArgumentTypeError, "{0} exists but isn't a folder".format(filename)):
                     executor.argparse_readable_folder(filename)
 
         it "complains if it's not readable":
             with a_directory() as directory:
-                os.chmod(directory, 0344)
+                os.chmod(directory, 0o344)
                 try:
-                    with self.assertRaisesRegexp(ArgumentTypeError, "{0} exists and is a folder but isn't readable".format(directory)):
+                    with self.fuzzyAssertRaisesError(ArgumentTypeError, "{0} exists and is a folder but isn't readable".format(directory)):
                         executor.argparse_readable_folder(directory)
                 finally:
-                    os.chmod(directory, 0644)
+                    os.chmod(directory, 0o644)
 
         it "is fine with it if it's just a directory":
             with a_directory() as directory:
@@ -38,18 +44,18 @@ describe TestCase, "cli arguments":
 
 describe TestCase, "Finding accounts":
     it "complains if the accounts doesn't exist":
-        with self.assertRaisesRegexp(SyncrError, "\"Could not find an accounts\.yaml\".+"):
+        with self.fuzzyAssertRaisesError(SyncrError, "Could not find an accounts\.yaml"):
             with a_file(removed=True) as filename:
                 executor.accounts_from(filename)
 
     it "complains if the accounts isn't readable":
-        with self.assertRaisesRegexp(SyncrError, "\"Could not read the accounts\.yaml\".+"):
+        with self.fuzzyAssertRaisesError(SyncrError, "Could not read the accounts\.yaml"):
             with a_file() as filename:
-                os.chmod(filename, 0344)
+                os.chmod(filename, 0o344)
                 executor.accounts_from(filename)
 
     it "Complains if it can't read the yaml":
-        with self.assertRaisesRegexp(SyncrError, "Failed to parse the accounts yaml file.+"):
+        with self.fuzzyAssertRaisesError(SyncrError, "Failed to parse the accounts yaml file"):
             with a_file("{blah.things: 2{}}") as filename:
                 executor.accounts_from(filename)
 
@@ -125,7 +131,7 @@ describe TestCase, "Making Amazon object":
         fake_accounts_from = mock.Mock(name="accounts_from")
         fake_accounts_from.return_value = accounts
 
-        with self.assertRaisesRegexp(SyncrError, "\"Please add this account to accounts\.yaml\"\taccount_name=prod.+"):
+        with self.fuzzyAssertRaisesError(SyncrError, "Please add this account to accounts\.yaml", account_name="prod"):
             with mock.patch("iam_syncr.executor.accounts_from", fake_accounts_from):
                 with a_directory() as directory:
                     folder = os.path.join(directory, "prod")
@@ -177,7 +183,7 @@ describe TestCase, "Doing the sync":
         fake_parse_configurations = mock.Mock(name="parse_configurations")
         fake_parse_configurations.return_value = {"somewhere": {}}
 
-        with self.assertRaisesRegexp(SyncrError, "\"Told to sync unknown types\"\tonly_sync=[^\]]+\]\tunknown_types=\['blah', 'stuff'\]"):
+        with self.fuzzyAssertRaisesError(SyncrError, "Told to sync unknown types", unknown_types=['blah', 'stuff']):
             with mock.patch("iam_syncr.executor.parse_configurations", fake_parse_configurations):
                 executor.do_sync(fake_amazon, fake_found, ["blah", "stuff"])
 
@@ -211,7 +217,7 @@ describe TestCase, "Parsing configuration":
 
 describe TestCase, "Finding the configuration":
     it "complains if it can't find any configuration":
-        with self.assertRaisesRegexp(NoConfiguration, ".+"):
+        with self.fuzzyAssertRaisesError(NoConfiguration):
             with a_directory() as directory:
                 executor.find_configurations(directory, "*.yaml")
 
@@ -246,10 +252,10 @@ describe TestCase, "Finding the configuration":
                 expected = set(expected)
 
                 if result != expected:
-                    print 'Got ============>'
-                    print sorted(result)
-                    print 'Expected ---------->'
-                    print sorted(expected)
+                    print('Got ============>')
+                    print(sorted(result))
+                    print('Expected ---------->')
+                    print(sorted(expected))
                 self.assertEqual(result, expected)
 
             assert_configs_for("*.yaml", [conf1, conf3, conf4, conf5, conf6, conf8])

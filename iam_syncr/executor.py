@@ -82,7 +82,7 @@ def accounts_from(location):
     except yaml.parser.ParserError as error:
         raise SyncrError("Failed to parse the accounts yaml file", location=location, error_typ=error.__class__.__name__, error=error)
 
-    for account_id in accounts.values():
+    for account_id in list(accounts.values()):
         if account_id not in accounts:
             accounts[account_id] = account_id
 
@@ -121,7 +121,7 @@ def do_sync(amazon, found, only_consider=None):
     if only_consider:
         dont_consider = [considering for considering in only_consider if considering not in sync.types]
         if dont_consider:
-            raise SyncrError("Told to sync unknown types", only_sync=sync.types.keys(), unknown_types=dont_consider)
+            raise SyncrError("Told to sync unknown types", only_sync=list(sync.types.keys()), unknown_types=dont_consider)
 
     for location, configuration in sorted(parsed.items()):
         sync.add(configuration, location, only_consider)
@@ -197,8 +197,8 @@ def main(argv=None):
         if not amazon.changes:
             log.info("No changes were made!")
     except SyncrError as err:
-        print "!" * 80
-        print "Something went wrong => {0} |:| {1}".format(err.__class__.__name__, err)
+        print("!" * 80)
+        print("Something went wrong => {0} |:| {1}".format(err.__class__.__name__, err))
         sys.exit(1)
 
 if __name__ == '__main__':

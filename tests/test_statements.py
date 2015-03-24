@@ -8,9 +8,14 @@ from iam_syncr.amazon.base import Amazon
 from noseOfYeti.tokeniser.support import noy_sup_setUp
 from textwrap import dedent
 import uuid
-import mock
+import six
 
 from tests.helpers import TestCase
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 describe TestCase, "Statements":
     before_each:
@@ -94,24 +99,24 @@ describe TestCase, "Statements":
             self.assertEqual(statements, [{"Action": action, "Resource": resource, "Other": other, "Effect": effect}])
 
         it "complains if no Effect is specified":
-            with self.assertRaisesRegexp(BadPolicy, "Need to specify whether we allow this policy or not.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "Need to specify whether we allow this policy or not"):
                 self.statements_from({})
 
-            with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Resource"):
                 self.statements_from({"Effect": "notchecked"})
 
-            with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Resource"):
                 self.statements_from({"allow": True})
 
-            with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Resource"):
                 self.statements_from({}, allow=True)
 
-            with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Resource"):
                 self.statements_from({}, allow=False)
 
         it "complains if allow is specified as something that isn't a boolean":
             for allow in (0, 1, None, [], [1], {}, {1:2}, lambda:1, mock.Mock(name="blah")):
-                with self.assertRaisesRegexp(BadPolicy, "Need to specify whether we allow this policy or not.+"):
+                with self.fuzzyAssertRaisesError(BadPolicy, "Need to specify whether we allow this policy or not"):
                     self.statements_from({"allow": allow})
 
         it "sets Effect to Allow or Deny according to what is set":
@@ -142,9 +147,9 @@ describe TestCase, "Statements":
                 self.assertEqual(self.statements_from(policy, allow=False), [{"Effect": "Deny", "Resource": "resource", dest: sorted(["Stuff", "otHer:*"])}])
 
         it "sets Resource and NotResource from resource and notresource":
-            res1, tres1 = mock.Mock(name="res1"), mock.Mock(name="tres1")
-            res2, tres2 = mock.Mock(name="res2"), mock.Mock(name="tres2")
-            res3, tres3, tres4 = mock.Mock(name="res3"), mock.Mock(name="tres3"), mock.Mock(name="tres4")
+            res1, tres1 = str(mock.Mock(name="res1")), str(mock.Mock(name="tres1"))
+            res2, tres2 = str(mock.Mock(name="res2")), str(mock.Mock(name="tres2"))
+            res3, tres3, tres4 = str(mock.Mock(name="res3")), str(mock.Mock(name="tres3")), str(mock.Mock(name="tres4"))
 
             fake_fill_out_resources = mock.Mock(name="fill_out_resources")
             fake_fill_out_resources.side_effect = lambda res: {res1:[tres1], res2:[tres2], res3:[tres3, tres4]}[res]
@@ -164,23 +169,23 @@ describe TestCase, "Statements":
                 self.assertEqual(self.statements_from(policy, allow=False, patches=patches), [{"Effect": "Deny", "Action": "action", dest: sorted([tres2, tres3, tres4])}])
 
         it "complains if no resource gets set":
-            with self.assertRaisesRegexp(BadPolicy, "No Resource.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Resource"):
                 self.statements_from({}, allow=True)
 
-            with self.assertRaisesRegexp(BadPolicy, "No Action.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Action"):
                 self.statements_from({"resource": "some_arn"}, allow=True)
 
-            with self.assertRaisesRegexp(BadPolicy, "No Action.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Action"):
                 self.statements_from({"notresource": "some_arn"}, allow=False)
 
-            with self.assertRaisesRegexp(BadPolicy, "No Action.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Action"):
                 self.statements_from({"Resource": "some_arn"}, allow=True)
 
-            with self.assertRaisesRegexp(BadPolicy, "No Action.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Action"):
                 self.statements_from({"NotResource": "some_arn"}, allow=False)
 
         it "complains if no action gets set":
-            with self.assertRaisesRegexp(BadPolicy, "No Action.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "No Action"):
                 self.statements_from({"Resource": "some_arn"}, allow=True)
 
             assert_works = lambda key, val, expected_key, expected_val: self.assertEqual(
@@ -214,7 +219,7 @@ describe TestCase, "Statements":
 
         it "complains if resource is not a string or dictionary":
             for resource in (0, 1, None, True, False, [[1]], lambda: 1, mock.Mock(name="mock")):
-                with self.assertRaisesRegexp(BadPolicy, "Resource should be a string or a dictionary.+"):
+                with self.fuzzyAssertRaisesError(BadPolicy, "Resource should be a string or a dictionary"):
                     list(self.statements.fill_out_resources(resource))
 
     describe "Expanding a resource":
@@ -246,7 +251,7 @@ describe TestCase, "Statements":
         it "complains if neither s3 or iam in the resource":
             resource = mock.MagicMock(name="resource")
             resource.__contains__.side_effect = lambda key: False
-            with self.assertRaisesRegexp(BadPolicy, "Unknown resource type"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "Unknown resource type"):
                 list(self.statements.expand_resource(resource))
             self.assertEqual(resource.__contains__.mock_calls, [mock.call("iam"), mock.call("s3")])
 
@@ -256,7 +261,7 @@ describe TestCase, "Statements":
             self.assertEqual(list(self.statements.iam_arns_from_specification({"iam": "__self__"})), [expected])
 
         it "complains if self_type is bucket and __self__ is used":
-            with self.assertRaisesRegexp(BadPolicy, "Bucket policy has no __self__ iam role.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "Bucket policy has no __self__ iam role"):
                 self.statements.self_type = "bucket"
                 list(self.statements.iam_arns_from_specification({"iam": "__self__"}))
 
@@ -269,7 +274,7 @@ describe TestCase, "Statements":
 
         it "complains if provided account is unknown":
             self.statements.accounts = {}
-            with self.assertRaisesRegexp(BadPolicy, "Unknown account specified.+"):
+            with self.fuzzyAssertRaisesError(BadPolicy, "Unknown account specified"):
                 list(self.statements.iam_arns_from_specification({"account": "unknown"}))
 
         it "uses provided account and name from the value":
@@ -301,7 +306,7 @@ describe TestCase, "Statements":
     describe "making a document":
         it "complains if given something that isn't a list":
             for statements in (0, 1, None, True, False, {}, {1:2}, lambda: 1, mock.Mock(name="blah"), "blah"):
-                with self.assertRaisesRegexp(Exception, "Statements should be a list!.+"):
+                with self.fuzzyAssertRaisesError(Exception, "Statements should be a list!"):
                     self.statements.make_document(statements)
 
         it "wraps the document with a Version and Statement and json dumps it":
@@ -316,6 +321,6 @@ describe TestCase, "Statements":
             fake_dumps.assert_called_once_with({"Version": "2012-10-17", "Statement":statements}, indent=2)
 
         it "raises invalid json as an InvalidDocument exception":
-            with self.assertRaisesRegexp(InvalidDocument, "Document wasn't valid json.+"):
+            with self.fuzzyAssertRaisesError(InvalidDocument, "Document wasn't valid json"):
                 self.statements.make_document([set([1, 2])])
 

@@ -2,8 +2,14 @@
 
 from iam_syncr.helpers import listify, listified, as_list
 
-from unittest import TestCase
-import mock
+import six
+
+from tests.helpers import TestCase
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 describe TestCase, "listify":
     it "sets the key in the dct to an empty array if doesn't exist and returns it":
@@ -33,9 +39,9 @@ describe TestCase, "listified":
             self.assertEqual(list(listified({"blah": val}, "blah")), [val])
 
     it "yields the items in the thing if the thing is a list":
-        item1 = mock.Mock(name="item1")
-        item2 = mock.Mock(name="item2")
-        item3 = mock.Mock(name="item3")
+        item1 = 3
+        item2 = 1
+        item3 = 2
         lst = [item1, item2, item3]
         self.assertEqual(list(listified({"blah": lst}, "blah")), [item1, item2, item3])
 

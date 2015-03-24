@@ -121,7 +121,7 @@ class Statements(object):
     def fill_out_resources(self, resources):
         """Fill out the resources"""
         for resource in as_list(resources):
-            if isinstance(resource, basestring):
+            if isinstance(resource, six.string_types):
                 yield resource
             elif isinstance(resource, dict):
                 for resource in self.expand_resource(resource):

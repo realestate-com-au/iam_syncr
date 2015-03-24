@@ -5,6 +5,7 @@ from iam_syncr.helpers import listified
 
 from option_merge import MergedOptions
 import logging
+import six
 
 log = logging.getLogger("iam_syncr.roles")
 
@@ -16,7 +17,7 @@ class RoleRemoval(object):
 
     def setup(self):
         """Make sure our name is a string"""
-        if not isinstance(self.name, basestring):
+        if not isinstance(self.name, six.string_types):
             raise BadRole("Told to remove a role, but not specified as a string", name=self.name, found_type=type(self.name))
 
     def resolve(self):

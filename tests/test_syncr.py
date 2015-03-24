@@ -5,9 +5,14 @@ from iam_syncr.amazon.base import Amazon
 from iam_syncr.syncer import Sync
 
 from noseOfYeti.tokeniser.support import noy_sup_setUp
-import mock
+import six
 
 from tests.helpers import TestCase
+
+if six.PY2:
+    import mock
+else:
+    from unittest import mock
 
 describe TestCase, "Sync":
     before_each:
@@ -35,7 +40,7 @@ describe TestCase, "Sync":
             combined = {"roles": roles, "other": other}
             self.sync.register_type("roles", dict, mock.Mock(name="kls"))
 
-            self.assertEqual(self.sync.types.keys(), ["roles"])
+            self.assertEqual(list(self.sync.types.keys()), ["roles"])
 
             fake_create_things = mock.Mock(name="create_things")
             fake_create_things.return_value = things
@@ -134,13 +139,13 @@ describe TestCase, "Sync":
     describe "Adding configuration":
         it "complains if types is empty":
             self.assertEqual(self.sync.types, {})
-            with self.assertRaisesRegexp(SyncrError, "Syncr doesn't know about anything, try syncr.register_default_types\(\) first"):
+            with self.fuzzyAssertRaisesError(SyncrError, "Syncr doesn't know about anything, try syncr.register_default_types\(\) first"):
                 self.sync.add(mock.Mock(name="configuration"), "somewhere")
 
         it "complains if the configuration isn't a dictionary":
             self.sync.register_default_types()
             for conf in (0, 1, True, False, None, [], [1], lambda: None, mock.Mock(name="conf")):
-                with self.assertRaisesRegexp(SyncrError, "Configuration needs to be a dict.+"):
+                with self.fuzzyAssertRaisesError(SyncrError, "Configuration needs to be a dict"):
                     self.sync.add(conf, "somewhere")
 
         it "Adds to self.configuration what is found in the configuration for each known type":
@@ -260,11 +265,13 @@ describe TestCase, "Sync":
                   , "two": {3: 4}
                   , "six": {5: 6}
                   }
-              , "remove_roles": ["hmm", "yeap"]
+              , "remove_roles": sorted(["hmm", "yeap"])
               }
 
             self.sync.register_default_types()
-            self.assertEqual(self.sync.merge_combined(combined), merged)
+            result = self.sync.merge_combined(combined)
+            result["remove_roles"] = sorted(result["remove_roles"])
+            self.assertEqual(result, merged)
 
     describe "Finding conflicting items":
         it "complains about values that are defined multiple places":

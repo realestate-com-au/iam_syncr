@@ -21,6 +21,7 @@ setup(
       { "tests":
         [ "noseOfYeti>=1.5.1"
         , "nose"
+        , "unittest2"
         , "mock"
         ]
       }
