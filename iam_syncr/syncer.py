@@ -1,6 +1,7 @@
 from iam_syncr.errors import SyncrError, InvalidConfiguration, ConflictingConfiguration, BadConfiguration, DuplicateItem
 from iam_syncr.roles import Role, RoleRemoval
 from iam_syncr.buckets import Bucket
+from iam_syncr.kms import Kms
 
 from collections import defaultdict
 import logging
@@ -47,7 +48,8 @@ class Sync(object):
         self.register_type("templates", dict, Template, priority=0)
         self.register_type("remove_roles", list, RoleRemoval, key_conflicts_with=["roles"], priority=10)
         self.register_type("roles", dict, Role, key_conflicts_with=["remove_roles"], priority=20)
-        self.register_type("buckets", dict, Bucket, priority=30)
+        self.register_type("keys", dict, Kms, priority=30)
+        self.register_type("buckets", dict, Bucket, priority=40)
 
     def register_type(self, name, typ, kls, key_conflicts_with=None, priority=None):
         """

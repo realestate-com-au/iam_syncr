@@ -8,11 +8,12 @@ import six
 log = logging.getLogger("iam_syncr.roles")
 
 class Statements(object):
-    def __init__(self, name, self_type, account_id, accounts):
+    def __init__(self, name, self_type, account_id, accounts, location=None):
         self.name = name
+        self.location = location
         self.self_type = self_type
-        if self_type not in ("role", "bucket"):
-            raise ProgrammerError("Statements can only be instantiated with self_type of role or bucket\tgot={0}".format(self_type))
+        if self_type not in ("role", "bucket", "key"):
+            raise ProgrammerError("Statements can only be instantiated with self_type of role or bucket or key\tgot={0}".format(self_type))
 
         self.accounts = accounts
         self.account_id = account_id
@@ -135,11 +136,17 @@ class Statements(object):
             for found in self.iam_arns_from_specification(resource):
                 yield found
 
+        elif "kms" in resource:
+            for found in self.kms_arns_from_specification(resource):
+                yield found
+
         elif "s3" in resource:
             for bucket_key in listify(resource, "s3"):
                 if bucket_key == "__self__":
                     if self.self_type == "role":
                         raise BadPolicy("Role policy has no __self__ bucket", role=self.name)
+                    elif self.self_type == "key":
+                        raise BadPolicy("Key policy has no __self__ bucket", key=self.name)
                     else:
                         bucket_key = self.name
                 yield "arn:aws:s3:::{0}".format(bucket_key)
@@ -148,6 +155,44 @@ class Statements(object):
 
         else:
             raise BadPolicy("Unknown resource type", resource=resource)
+
+    def kms_arns_from_specification(self, resource):
+        """Get us kms arns from this specification"""
+        for key_id in listify(resource, "kms"):
+            alias = None
+            if key_id == "__self__":
+                if self.self_type != "key":
+                    raise BadPolicy("No __self__ key for this policy", type=self.self_type, name=self.name)
+                else:
+                    alias = self.name
+                    location = self.location
+
+            if not alias:
+                if isinstance(key_id, six.string_types):
+                    alias = key_id
+                    location = resource.get("location", self.location)
+                else:
+                    alias = key_id.get("alias")
+                    location = key_id.get("location", resource.get("location", self.location))
+                    key_id = key_id.get("key_id")
+
+            provided_accounts = resource.get("account", "")
+            if not isinstance(provided_accounts, list):
+                provided_accounts = [provided_accounts]
+
+            for provided_account in provided_accounts:
+                if provided_account:
+                    if provided_account not in self.accounts:
+                        raise BadPolicy("Unknown account specified", account=provided_account, specification=resource)
+                    else:
+                        account_id = self.accounts[provided_account]
+                else:
+                    account_id = self.account_id
+
+                if alias:
+                    yield "arn:aws:kms:{0}:{1}:alias/{2}".format(location, account_id, alias)
+                else:
+                    yield "arn:aws:kms:{0}:{1}:key/{2}".format(location, account_id, key_id)
 
     def iam_arns_from_specification(self, specification):
         """Get us an iam arn from this specification"""

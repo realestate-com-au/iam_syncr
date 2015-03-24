@@ -7,7 +7,7 @@ import boto
 
 log = logging.getLogger("iam_syncr.amazon.buckets")
 
-class AmazonBuckets(object, AmazonMixin):
+class AmazonBuckets(AmazonMixin, object):
     def __init__(self, amazon):
         self.amazon = amazon
         self.documents = AmazonDocuments()

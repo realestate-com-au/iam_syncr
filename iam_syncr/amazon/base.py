@@ -2,6 +2,7 @@ from iam_syncr.errors import SyncrError
 
 from boto.iam.connection import IAMConnection
 from boto.s3.connection import S3Connection
+from boto.kms.layer1 import KMSConnection
 import logging
 import boto
 import sys
@@ -67,4 +68,15 @@ class Amazon(object):
             except boto.exception.NoAuthHandlerFound:
                 raise SyncrError("Export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY before running this script (your aws credentials)")
         return self._s3_connection
+
+    def kms_connection_for(self, location):
+        if getattr(self, "_kms_connections", None) is None:
+            self._kms_connections = {}
+
+        if location not in self._kms_connections:
+            try:
+                self._kms_connections[location] = boto.kms.connect_to_region(location)
+            except boto.exception.NoAuthHandlerFound:
+                raise SyncrError("Export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY before running this script (your aws credentials)")
+        return self._kms_connections[location]
 

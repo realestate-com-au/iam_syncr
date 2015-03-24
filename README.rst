@@ -78,6 +78,13 @@ The yaml looks something like::
          deny_permission: [<permission_statemnt> where "Effect" is set to "Deny"]
          allow_permission: [<permission_statemnt> where "Effect" is set to "Allow"]
 
+   keys:
+      <kms key alias>:
+         location: <ap-southeast-2, us-east-1, etc>
+         permission: [<permission_statements>]
+         deny_permission: [<permission_statemnt> where "Effect" is set to "Deny"]
+         allow_permission: [<permission_statemnt> where "Effect" is set to "Allow"]
+
    remove_role:
       - <role_name>
       - <role_name>

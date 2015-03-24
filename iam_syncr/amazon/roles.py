@@ -8,7 +8,7 @@ import json
 
 log = logging.getLogger("iam_syncr.amazon.roles")
 
-class AmazonRoles(object, AmazonMixin):
+class AmazonRoles(AmazonMixin, object):
     def __init__(self, amazon):
         self.amazon = amazon
         self.documents = AmazonDocuments()
