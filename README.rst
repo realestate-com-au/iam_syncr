@@ -85,6 +85,13 @@ The yaml looks something like::
          deny_permission: [<permission_statemnt> where "Effect" is set to "Deny"]
          allow_permission: [<permission_statemnt> where "Effect" is set to "Allow"]
 
+         grant:
+            - grantee: <iam_specifier>
+              retiree: <iam_specifier>
+              operations: (see http://boto.readthedocs.org/en/latest/ref/kms.html#boto.kms.layer1.KMSConnection.create_grant)
+              constraints: <dictionary>
+              grant_tokens: <list>
+
    remove_role:
       - <role_name>
       - <role_name>

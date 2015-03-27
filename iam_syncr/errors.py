@@ -38,3 +38,6 @@ class CantFindTemplate(SyncrError):
 class NoTemplates(SyncrError):
     desc = "No templates defined"
 
+class BadAlias(SyncrError):
+    desc = "Bad kms alias"
+

@@ -48,7 +48,7 @@ class Amazon(object):
             else:
                 raise
 
-        roles = result["list_roles_response"]["list_roles_result"]["roles"]
+        roles = self.all_roles = result["list_roles_response"]["list_roles_result"]["roles"]
         if not roles:
             raise SyncrError("There are no roles in your account, I can't figure out the account id")
 
