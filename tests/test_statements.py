@@ -248,12 +248,12 @@ describe TestCase, "Statements":
         it "sets resources as bucket and bucket/* if / not in bucket_key":
             self.assertEqual(list(self.statements.expand_resource({"s3": "bucket"})), ["arn:aws:s3:::bucket", "arn:aws:s3:::bucket/*"])
 
-        it "complains if neither s3 or iam in the resource":
+        it "complains if neither s3, kms or iam in the resource":
             resource = mock.MagicMock(name="resource")
             resource.__contains__.side_effect = lambda key: False
             with self.fuzzyAssertRaisesError(BadPolicy, "Unknown resource type"):
                 list(self.statements.expand_resource(resource))
-            self.assertEqual(resource.__contains__.mock_calls, [mock.call("iam"), mock.call("s3")])
+            self.assertEqual(resource.__contains__.mock_calls, [mock.call("iam"), mock.call("kms"), mock.call("s3")])
 
     describe "Getting iam arn from a specification":
         it "uses self.account_id when __self__ is specified":
