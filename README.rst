@@ -81,6 +81,8 @@ The yaml looks something like::
    keys:
       <kms key alias>:
          location: <ap-southeast-2, us-east-1, etc>
+         admin_users: <iam_specifier>
+
          permission: [<permission_statements>]
          deny_permission: [<permission_statemnt> where "Effect" is set to "Deny"]
          allow_permission: [<permission_statemnt> where "Effect" is set to "Allow"]
@@ -163,6 +165,14 @@ Where ``<iam_specifer>`` can be:
    "arn:aws:iam::<account>:<specifier>"
 
    Where account is retrieved from our accounts dictionary from accounts.yaml
+
+KMS keys
+========
+
+You can create kms keys and associated grants using the ``keys`` namespace.
+
+These keys will automatically get access from the root of the account, as well as
+all kms actions from any ``admin_users`` you specify.
 
 Dry Run
 =======
