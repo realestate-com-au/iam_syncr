@@ -2,10 +2,15 @@ from iam_syncr.errors import SyncrError
 
 from boto.iam.connection import IAMConnection
 from boto.s3.connection import S3Connection
-from boto.kms.layer1 import KMSConnection
 import logging
 import boto
 import sys
+import six
+
+if six.PY2:
+    KMSConnection = None
+else:
+    from boto.kms.layer1 import KMSConnection
 
 log = logging.getLogger("iam_syncr.amazon.base")
 
@@ -70,6 +75,9 @@ class Amazon(object):
         return self._s3_connection
 
     def kms_connection_for(self, location):
+        if KMSConnection is None:
+            raise SyncrError("Sorry, need python3 to do anything related to kms")
+
         if getattr(self, "_kms_connections", None) is None:
             self._kms_connections = {}
 

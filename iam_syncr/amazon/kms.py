@@ -2,9 +2,12 @@ from iam_syncr.amazon.documents import AmazonDocuments
 from iam_syncr.amazon.common import AmazonMixin
 from iam_syncr.errors import BadAlias, BadRole
 
-import boto.kms.exceptions
 import logging
 import boto
+import six
+
+if not six.PY2:
+    import boto.kms.exceptions
 
 log = logging.getLogger("iam_syncr.amazon.kms")
 
