@@ -140,6 +140,10 @@ class Statements(object):
             for found in self.kms_arns_from_specification(resource):
                 yield found
 
+        elif "sns" in resource:
+            for found in self.sns_arns_from_specification(resource):
+                yield found
+
         elif "s3" in resource:
             for bucket_key in listify(resource, "s3"):
                 if bucket_key == "__self__":
@@ -155,6 +159,29 @@ class Statements(object):
 
         else:
             raise BadPolicy("Unknown resource type", resource=resource)
+
+    def sns_arns_from_specification(self, resource):
+        """Get us kms arns from this specification"""
+        for key_id in listify(resource, "sns"):
+            location = self.location
+            if 'location' in resource:
+                location = resource['location']
+
+            provided_accounts = resource.get("account", "")
+            if not isinstance(provided_accounts, list):
+                provided_accounts = [provided_accounts]
+
+            for provided_account in provided_accounts:
+                if provided_account:
+                    if provided_account not in self.accounts:
+                        raise BadPolicy("Unknown account specified", account=provided_account, specification=resource)
+                    else:
+                        account_id = self.accounts[provided_account]
+                else:
+                    account_id = self.account_id
+
+                yield "arn:aws:sns:{0}:{1}:{2}".format(location, account_id, key_id)
+
 
     def kms_arns_from_specification(self, resource):
         """Get us kms arns from this specification"""
