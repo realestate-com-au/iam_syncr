@@ -27,7 +27,7 @@ class AmazonBuckets(AmazonMixin, object):
     def current_policy(self, bucket):
         """Return the current policy for this bucket"""
         try:
-            return bucket.get_policy()
+            return bucket.get_policy().decode('utf-8')
         except boto.exception.S3ResponseError as error:
             if error.status == 404:
                 return "{}"
