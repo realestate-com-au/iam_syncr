@@ -73,13 +73,17 @@ class AmazonKms(AmazonMixin, object):
             policy["Operations"] = sorted(policy["Operations"])
 
         for policy in grant:
-            nxt = {"GranteePrincipal": self.user_from_arn(policy["grantee"]), "RetireePrincipal": self.user_from_arn(policy.get("Retiree")), "Operations": sorted(policy["operations"]), "Constraints": policy.get("constraints"), "GrantTokens": policy.get("grant_tokens")}
+            nxt = {"GranteePrincipal": policy["grantee"], "RetireePrincipal": policy.get("Retiree"), "Operations": sorted(policy["operations"]), "Constraints": policy.get("constraints"), "GrantTokens": policy.get("grant_tokens")}
             nxt = dict((key, val) for key, val in nxt.items() if val is not None)
 
-            if not any(all(current[key] == val for key, val in nxt.items()) for current in current_grants):
+            if not any(all(current[key] == val for key, val in nxt.items() if key not in ("GrantId", "IssuingAccount")) for current in current_grants):
                 new_grants.append(policy)
 
         for policy in new_grants:
+            for translateable in ("GranteePrincipal", "RetireePrincipal"):
+                if translateable in policy:
+                    policy[translateable] = self.user_from_arn(policy[translateable])
+
             for _ in self.change("+", "key_grant", key=alias, grantee=policy["grantee"]):
                 self.connection.create_grant(key_id, policy["grantee"], retiring_principal=policy.get("retiree"), operations=policy["operations"], constraints=policy.get("constraints"), grant_tokens=policy.get("grant_tokens"))
 
