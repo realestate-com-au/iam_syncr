@@ -88,9 +88,13 @@ class AmazonKms(AmazonMixin, object):
         if arn is None:
             return
 
+        user_ids = [item["user_id"] for item in self.amazon.all_users if item['arn'] == arn]
         role_ids = [item["role_id"] for item in self.amazon.all_roles if item['arn'] == arn]
-        if len(role_ids) != 1:
-            raise BadRole("Didn't find a single role id for specified arn", got=role_ids, arn=arn)
+        if user_ids and role_ids or len(user_ids) > 1 or len(role_ids) > 1:
+            raise BadRole("Didn't find a single role id for specified arn", got_roles=role_ids, got_users=user_ids, arn=arn)
 
-        return role_ids[0]
+        if role_ids:
+            return role_ids[0]
+        else:
+            return user_ids[0]
 

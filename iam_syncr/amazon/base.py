@@ -45,17 +45,30 @@ class Amazon(object):
         except boto.exception.NoAuthHandlerFound:
             raise SyncrError("Export AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY before running this script (your aws credentials)")
 
+        # Need roles to make sure we have the correct account
+        log.info("Finding roles in your account")
         try:
             result = connection.list_roles()
         except boto.exception.BotoServerError as error:
             if error.status == 403:
-                raise SyncrError("Your credentials aren't allowed to look at iam :(")
+                raise SyncrError("Your credentials aren't allowed to look at iam roles :(")
             else:
                 raise
 
         roles = self.all_roles = result["list_roles_response"]["list_roles_result"]["roles"]
         if not roles:
             raise SyncrError("There are no roles in your account, I can't figure out the account id")
+
+        # Need users for kms to be able to grant to users
+        log.info("Finding users in your account")
+        try:
+            result = connection.get_all_users()
+        except boto.exception.BotoServerError as error:
+            if error.status == 403:
+                raise SyncrError("Your credentials aren't allowed to look at iam users :(")
+            else:
+                raise
+        self.all_users = result["list_users_response"]["list_users_result"]["users"]
 
         amazon_account_id = roles[0]['arn'].split(":")[4]
         if str(self.account_id) != str(amazon_account_id):
