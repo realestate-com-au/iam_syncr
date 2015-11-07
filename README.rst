@@ -1,3 +1,14 @@
+Deprecated!!!
+=============
+
+This library is deprecated in favour of ``aws_syncr``.
+
+See http://aws-syncr.readthedocs.org/
+
+
+-------------------------------------------------------------------------------
+
+
 IAM syncr
 =========
 
